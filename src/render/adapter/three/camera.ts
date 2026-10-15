@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { Vector2 } from "@/world/domain/geometry";
 
 /** How high above the arena the camera sits. Only affects perspective-free ortho rendering, not zoom. */
 const CAMERA_HEIGHT = 500;
@@ -31,6 +32,20 @@ export function createCamera(aspect: number): THREE.OrthographicCamera {
   camera.up.set(0, 0, -1);
   camera.lookAt(0, 0, 0);
   return camera;
+}
+
+/**
+ * Keeps the camera centered on the player's current position every frame. Without this the
+ * camera stays fixed on the arena's world-space origin — the player sails off-screen the
+ * moment they move away from the center, since the orthographic frustum (±150 units at
+ * minimum zoom) is far smaller than the arena. This was missing end-to-end from the design
+ * spec through task 012's own doc (which only ever specified "look at the arena center" +
+ * zoom-by-mass, never follow-by-position) — caught by an actual browser playtest, not by
+ * code review, since nothing in the docs flagged it as absent.
+ */
+export function updateCameraPosition(camera: THREE.OrthographicCamera, playerPosition: Vector2): void {
+  camera.position.set(playerPosition.x, CAMERA_HEIGHT, playerPosition.z);
+  camera.lookAt(playerPosition.x, 0, playerPosition.z);
 }
 
 export function updateCameraAspect(camera: THREE.OrthographicCamera, aspect: number): void {

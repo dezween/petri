@@ -4,7 +4,7 @@ import type { WorldSnapshot } from "@/world/service/world.service";
 import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
 import { createScene } from "./scene";
 import { addLighting } from "./lighting";
-import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect } from "./camera";
+import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
 import { CellMeshFactory } from "./cell-mesh-factory";
 
@@ -51,6 +51,7 @@ export class ThreeRenderer implements IRenderer {
     if (!this.renderer) return;
     this.meshFactory?.updateFromSnapshot(snapshot);
     adjustZoomForPlayerRadius(this.camera, snapshot.player.radius);
+    updateCameraPosition(this.camera, snapshot.player.position);
     this.renderer.render(this.scene, this.camera);
   }
 
