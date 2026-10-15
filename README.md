@@ -4,6 +4,9 @@ A single-player, 3D, agar.io-style browser game. Move your cell with the cursor,
 smaller bots, avoid bigger ones. No multiplayer, no skills (no split, no eject mass) — just
 growth and survival in a bounded, top-down petri-dish arena.
 
+**Play it now: [dezween.github.io/petri](https://dezween.github.io/petri/)** — deployed
+automatically from `main` via GitHub Pages.
+
 ## Run it
 
 ```bash
@@ -45,3 +48,10 @@ root that wires concrete adapters into services and runs the per-frame game loop
 ```bash
 npx vitest run
 ```
+
+## Releases
+
+Pushing a `v*` tag (e.g. `v1.0.0`) triggers `.github/workflows/release.yml`, which rebuilds
+the app, packages `dist/` as `.zip` and `.tar.gz`, and attaches both to a GitHub Release for
+that tag with auto-generated release notes. See the
+[Releases page](https://github.com/dezween/petri/releases) for downloadable builds.
