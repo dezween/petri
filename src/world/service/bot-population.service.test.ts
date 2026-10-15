@@ -48,6 +48,27 @@ describe("BotPopulationService.spawnInitialBots", () => {
     }
   });
 
+  it("falls back to the last attempted candidate (not a crash/hang) once all spawn retries fail the min-distance-from-player check", () => {
+    // An arena small enough that no point in the disk can ever be >= 250 units (the
+    // configured MIN_SPAWN_DISTANCE_FROM_PLAYER) from a centered player — every one of the
+    // 10 retry attempts must fail the distance check, exercising the documented fallback.
+    const service = new BotPopulationService({
+      respawnDelaySeconds: 3,
+      thresholds: [{ mass: 0, totalCount: 3, hunterRatio: 0 }],
+    });
+    const player = makePlayer();
+    player.position = { x: 0, z: 0 };
+    const tinyArenaWidth = 100; // max sample radius (~50) well under the 250 min distance
+
+    const bots = service.spawnInitialBots(tinyArenaWidth, player);
+
+    expect(bots).toHaveLength(3);
+    for (const bot of bots) {
+      expect(Number.isFinite(bot.position.x)).toBe(true);
+      expect(Number.isFinite(bot.position.z)).toBe(true);
+    }
+  });
+
   it("never spawns outside the arena's circular floor, even near the square bounding box's corners", () => {
     // Player far from the arena center so the min-distance-from-player retry logic
     // doesn't itself bias bots away from the corners — isolates the disk-sampling check.

@@ -41,6 +41,25 @@ describe("FoodSpawnerService.spawnInitialFood", () => {
   });
 });
 
+describe("FoodSpawnerService.spawnInitialFood — exhausted retries", () => {
+  it("falls back to the last attempted candidate (not a crash/hang) once all spawn retries fail the min-distance-from-blockers check", () => {
+    // An arena small enough that no point in the disk can ever be >= 150 units (the
+    // configured MIN_SPAWN_DISTANCE_FROM_ENTITY) from a centered player — every one of the
+    // 10 retry attempts must fail the distance check, exercising the documented fallback.
+    const service = new FoodSpawnerService({ targetCount: 3, respawnDelaySeconds: 3 });
+    const player = makePlayer({ x: 0, z: 0 });
+    const tinyArenaWidth = 60; // max sample radius (~30) well under the 150 min distance
+
+    const food = service.spawnInitialFood(tinyArenaWidth, player, []);
+
+    expect(food).toHaveLength(3);
+    for (const f of food) {
+      expect(Number.isFinite(f.position.x)).toBe(true);
+      expect(Number.isFinite(f.position.z)).toBe(true);
+    }
+  });
+});
+
 describe("FoodSpawnerService.spawnInitialFood — circular arena bound", () => {
   it("never spawns outside the arena's circular floor, even near the square bounding box's corners", () => {
     // Player/bots far from the arena center so the min-distance-from-blockers retry
