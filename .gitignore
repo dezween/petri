@@ -5,3 +5,5 @@ dist
 .env
 .env.*
 *.blend1
+__pycache__/
+*.pyc
