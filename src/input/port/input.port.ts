@@ -2,7 +2,8 @@ import type { Vector2 } from "@/world/domain/geometry";
 
 /**
  * The only input mechanic in this game: a normalized direction toward the cursor. No split,
- * no eject, no keyboard — confirmed out of scope per docs/SPEC.md.
+ * no eject, no keyboard — confirmed out of scope per docs/epic-1/SPEC.md (and reconfirmed out
+ * of scope for docs/epic-2/SPEC.md too).
  */
 export interface IInputSource {
   /**

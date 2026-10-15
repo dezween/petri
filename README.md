@@ -40,8 +40,9 @@ Hexagonal (ports & adapters), one directory per module under `src/`: `world` hol
 real domain/business logic (entities, growth/eating rules, bot AI); `render`, `input`, and `ui`
 are presentation-only adapters around their respective ports; `session` is the composition
 root that wires concrete adapters into services and runs the per-frame game loop. See
-[`docs/SPEC.md`](docs/SPEC.md) for the full design spec and game rules, and
-[`docs/TASKS.md`](docs/TASKS.md) for the numbered task breakdown this codebase was built from.
+[`docs/epic-1/SPEC.md`](docs/epic-1/SPEC.md) for the full design spec and game rules, and
+[`docs/epic-1/TASKS.md`](docs/epic-1/TASKS.md) for the numbered task breakdown this codebase was built from.
+See [`docs/epic-2/SPEC.md`](docs/epic-2/SPEC.md) for what's planned next.
 
 ## Tests
 
