@@ -66,6 +66,12 @@ export class ThreeRenderer implements IRenderer {
     updateCameraAspect(this.camera, safeAspect(width, height));
   }
 
+  /**
+   * Intentionally unreachable in the current wiring (this app never tears down its one
+   * long-lived instance) — kept alive by this class's own tests only, until the app gains a
+   * real teardown path (HMR support, embeddable widget use case, etc.). Not dead code to
+   * delete; a future lint/dead-code pass just won't have call-site context for it yet.
+   */
   dispose(): void {
     if (this.meshFactory) {
       // Remove before disposing: avoids any chance of the group's children still being

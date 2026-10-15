@@ -47,6 +47,18 @@ describe("GameOverAdapter", () => {
     expect(root.hidden).toBe(true);
   });
 
+  it("falls back to 0 instead of displaying the literal string 'NaN'", () => {
+    const { adapter, scoreValue } = build();
+    adapter.show(NaN);
+    expect(scoreValue.textContent).toBe("0");
+  });
+
+  it("does nothing on click when no handler has been registered yet", () => {
+    const { restartButton, mainMenuButton } = build();
+    expect(() => restartButton.click()).not.toThrow();
+    expect(() => mainMenuButton.click()).not.toThrow();
+  });
+
   it("calls the restart handler when the restart button is clicked", () => {
     const { adapter, restartButton } = build();
     const onRestart = vi.fn();

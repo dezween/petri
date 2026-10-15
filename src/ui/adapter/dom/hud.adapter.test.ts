@@ -16,6 +16,16 @@ describe("HudAdapter", () => {
     expect(value.textContent).toBe("43");
   });
 
+  it("falls back to 0 instead of displaying the literal string 'NaN'", () => {
+    const root = createFakeElement();
+    const value = createFakeElement();
+    const hud = new HudAdapter(root as unknown as HTMLElement, value as unknown as HTMLElement);
+
+    hud.updateMass(NaN);
+
+    expect(value.textContent).toBe("0");
+  });
+
   it("show()/hide() toggle the root element's hidden attribute", () => {
     const root = createFakeElement();
     const value = createFakeElement();

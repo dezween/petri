@@ -30,7 +30,9 @@ export class VictoryAdapter implements ResultScreen {
   }
 
   show(finalMass: number): void {
-    this.scoreValueElement.textContent = String(Math.round(finalMass));
+    // Last line of defense before an upstream NaN (e.g. a division-by-zero bug) would
+    // otherwise render the literal string "NaN" to the player.
+    this.scoreValueElement.textContent = String(Number.isFinite(finalMass) ? Math.round(finalMass) : 0);
     this.root.hidden = false;
   }
 
