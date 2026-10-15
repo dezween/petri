@@ -2,6 +2,9 @@ import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
+  // Served from https://dezween.github.io/petri/ via GitHub Pages (a project site, not a
+  // custom domain), so asset URLs must be rooted at the repo name rather than "/".
+  base: "/petri/",
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
