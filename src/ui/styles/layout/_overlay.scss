@@ -28,6 +28,13 @@
   // a floating card, which keeps this correct without needing extra wrapper markup.
   background: var(--color-bg);
   backdrop-filter: blur(var(--blur));
+
+  // Author styles always win over the UA stylesheet's `[hidden] { display: none }`,
+  // regardless of specificity — so without this, a hidden `.screen` still lays out as
+  // `flex` and intercepts pointer events meant for whichever screen is actually shown.
+  &[hidden] {
+    display: none;
+  }
 }
 
 // HUD sits in a corner and must never capture pointer input — the mouse-direction input
