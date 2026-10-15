@@ -1,0 +1,172 @@
+import { describe, expect, it, vi } from "vitest";
+import type { IInputSource } from "@/input/port/input.port";
+import type { IRenderer } from "@/render/port/renderer.port";
+import type { TickResult, WorldService, WorldSnapshot } from "@/world/service/world.service";
+import { GameLoopService, type AnimationScheduler } from "./game-loop.service";
+
+/** A controllable fake rAF scheduler: frames only fire when the test asks for them. */
+function createFakeScheduler() {
+  let nextHandle = 1;
+  const pending = new Map<number, (timestamp: number) => void>();
+
+  const scheduler: AnimationScheduler = {
+    requestFrame: vi.fn((callback: (timestamp: number) => void) => {
+      const handle = nextHandle++;
+      pending.set(handle, callback);
+      return handle;
+    }),
+    cancelFrame: vi.fn((handle: number) => {
+      pending.delete(handle);
+    }),
+  };
+
+  return {
+    scheduler,
+    /** Fires the most recently scheduled frame, as if the browser had invoked it. */
+    fireNextFrame(timestamp: number) {
+      const entries = [...pending.entries()];
+      const last = entries[entries.length - 1];
+      if (!last) throw new Error("no frame was scheduled");
+      const [handle, callback] = last;
+      pending.delete(handle);
+      callback(timestamp);
+    },
+    pendingCount() {
+      return pending.size;
+    },
+  };
+}
+
+const fakeSnapshot: WorldSnapshot = {
+  player: { id: "p1", position: { x: 0, z: 0 }, radius: 10, mass: 25 },
+  bots: [],
+  food: [],
+  arenaWidth: 1000,
+};
+
+function createFakeWorldService(result: TickResult = { playerEaten: false, victoryReached: false }) {
+  return {
+    tick: vi.fn(() => result),
+    getSnapshot: vi.fn(() => fakeSnapshot),
+  } as unknown as WorldService;
+}
+
+function createFakeInput(direction = { x: 0, z: 0 }): IInputSource {
+  return { getDirection: vi.fn(() => direction) };
+}
+
+function createFakeRenderer(): IRenderer {
+  return {
+    init: vi.fn(),
+    render: vi.fn(),
+    resize: vi.fn(),
+    dispose: vi.fn(),
+  };
+}
+
+describe("GameLoopService", () => {
+  it("reads input, ticks the world, and renders the resulting snapshot each frame", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const input = createFakeInput({ x: 1, z: 0 });
+    const world = createFakeWorldService();
+    const renderer = createFakeRenderer();
+    const loop = new GameLoopService(input, world, renderer, {}, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(input.getDirection).toHaveBeenCalled();
+    expect(world.tick).toHaveBeenCalledWith(0, { x: 1, z: 0 });
+    expect(renderer.render).toHaveBeenCalledWith(fakeSnapshot);
+  });
+
+  it("computes deltaTime from real elapsed time between frames, not a fixed value", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService();
+    const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), {}, scheduler);
+
+    loop.start();
+    fireNextFrame(1000); // first frame: no prior timestamp, deltaTime = 0
+    fireNextFrame(1250); // 250ms later
+
+    expect(world.tick).toHaveBeenNthCalledWith(1, 0, { x: 0, z: 0 });
+    expect(world.tick).toHaveBeenNthCalledWith(2, 0.25, { x: 0, z: 0 });
+  });
+
+  it("stop() halts the loop so no further frames are scheduled", () => {
+    const { scheduler, fireNextFrame, pendingCount } = createFakeScheduler();
+    const loop = new GameLoopService(createFakeInput(), createFakeWorldService(), createFakeRenderer(), {}, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+    expect(pendingCount()).toBe(1); // next frame already queued by the tick that just ran
+
+    loop.stop();
+
+    expect(pendingCount()).toBe(0);
+    expect(loop.isRunning).toBe(false);
+  });
+
+  it("fires onPlayerEaten exactly once for a single death occurrence, even across multiple frames", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService({ playerEaten: true, victoryReached: false });
+    const onPlayerEaten = vi.fn();
+    const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), { onPlayerEaten }, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+    fireNextFrame(32);
+
+    expect(onPlayerEaten).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires onVictoryReached exactly once for a single victory-cap occurrence, even across multiple frames", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService({ playerEaten: false, victoryReached: true });
+    const onVictoryReached = vi.fn();
+    const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), { onVictoryReached }, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+    fireNextFrame(32);
+
+    expect(onVictoryReached).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fire callbacks when neither death nor victory occurred", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const onPlayerEaten = vi.fn();
+    const onVictoryReached = vi.fn();
+    const loop = new GameLoopService(
+      createFakeInput(),
+      createFakeWorldService(),
+      createFakeRenderer(),
+      { onPlayerEaten, onVictoryReached },
+      scheduler,
+    );
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(onPlayerEaten).not.toHaveBeenCalled();
+    expect(onVictoryReached).not.toHaveBeenCalled();
+  });
+
+  it("start() is a no-op when already running — doesn't schedule a second loop", () => {
+    const { scheduler } = createFakeScheduler();
+    const loop = new GameLoopService(createFakeInput(), createFakeWorldService(), createFakeRenderer(), {}, scheduler);
+
+    loop.start();
+    loop.start();
+
+    expect(scheduler.requestFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it("stop() before start() is a safe no-op", () => {
+    const { scheduler } = createFakeScheduler();
+    const loop = new GameLoopService(createFakeInput(), createFakeWorldService(), createFakeRenderer(), {}, scheduler);
+
+    expect(() => loop.stop()).not.toThrow();
+    expect(scheduler.cancelFrame).not.toHaveBeenCalled();
+  });
+});

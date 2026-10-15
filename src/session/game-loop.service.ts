@@ -1,0 +1,85 @@
+import type { IInputSource } from "@/input/port/input.port";
+import type { IRenderer } from "@/render/port/renderer.port";
+import type { WorldService } from "@/world/service/world.service";
+
+export interface GameLoopCallbacks {
+  onPlayerEaten?: () => void;
+  onVictoryReached?: () => void;
+}
+
+/**
+ * Abstraction over requestAnimationFrame/cancelAnimationFrame so tests can drive the loop with
+ * a fake clock instead of depending on a real browser frame scheduler.
+ */
+export interface AnimationScheduler {
+  requestFrame(callback: (timestamp: number) => void): number;
+  cancelFrame(handle: number): void;
+}
+
+const browserScheduler: AnimationScheduler = {
+  requestFrame: (callback) => requestAnimationFrame(callback),
+  cancelFrame: (handle) => cancelAnimationFrame(handle),
+};
+
+/**
+ * The first point where input, world, and render meet. Each frame: read input -> tick the
+ * world -> render the result. Doesn't own UI state transitions (task 018's job) — it only
+ * reports a death/victory-cap occurrence once each via callbacks and keeps running until the
+ * caller explicitly calls stop() (e.g. from inside one of those callbacks).
+ */
+export class GameLoopService {
+  private rafHandle: number | null = null;
+  private lastTimestamp: number | null = null;
+  private hasFiredPlayerEaten = false;
+  private hasFiredVictory = false;
+
+  constructor(
+    private readonly inputSource: IInputSource,
+    private readonly worldService: WorldService,
+    private readonly renderer: IRenderer,
+    private readonly callbacks: GameLoopCallbacks = {},
+    private readonly scheduler: AnimationScheduler = browserScheduler,
+  ) {}
+
+  start(): void {
+    if (this.rafHandle !== null) return; // already running
+    this.lastTimestamp = null;
+    this.hasFiredPlayerEaten = false;
+    this.hasFiredVictory = false;
+    this.rafHandle = this.scheduler.requestFrame(this.tick);
+  }
+
+  stop(): void {
+    if (this.rafHandle !== null) {
+      this.scheduler.cancelFrame(this.rafHandle);
+      this.rafHandle = null;
+    }
+    this.lastTimestamp = null;
+  }
+
+  get isRunning(): boolean {
+    return this.rafHandle !== null;
+  }
+
+  private readonly tick = (timestamp: number): void => {
+    // No prior frame to diff against yet — tick with zero movement rather than guessing.
+    const deltaTime = this.lastTimestamp === null ? 0 : (timestamp - this.lastTimestamp) / 1000;
+    this.lastTimestamp = timestamp;
+
+    const direction = this.inputSource.getDirection();
+    const result = this.worldService.tick(deltaTime, direction);
+    this.renderer.render(this.worldService.getSnapshot());
+
+    if (result.playerEaten && !this.hasFiredPlayerEaten) {
+      this.hasFiredPlayerEaten = true;
+      this.callbacks.onPlayerEaten?.();
+    }
+
+    if (result.victoryReached && !this.hasFiredVictory) {
+      this.hasFiredVictory = true;
+      this.callbacks.onVictoryReached?.();
+    }
+
+    this.rafHandle = this.scheduler.requestFrame(this.tick);
+  };
+}
