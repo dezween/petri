@@ -32,12 +32,21 @@ src/
         web-audio-player.adapter.ts
 
   render/                      # EXTENDED — still presentation-only
+    port/
+      renderer.port.ts           # gains IRenderer.setArenaWidth(width) — see task 001; the
+                                  # renderer is a construction-time singleton (built once in
+                                  # bootstrap.ts before any menu/size choice exists), so
+                                  # changing arenaWidth after construction needs an explicit
+                                  # port method, it isn't already free with the existing
+                                  # init/render/resize/dispose contract.
     adapter/
       three/
-        scene.ts                 # gains lab-bench ground plane + static props
+        scene.ts                 # gains lab-bench ground plane + static props; its
+                                  # floor/rim-building logic is reused by task 001's new
+                                  # ThreeRenderer.setArenaWidth(width) to rebuild in place
         post-processing.ts        # NEW — bloom + DOF via EffectComposer
         particles.ts              # NEW — eat-burst particle system
-        (existing files unchanged in shape)
+        (existing files unchanged in shape otherwise)
 
   ui/                          # EXTENDED
     adapter/
@@ -69,10 +78,20 @@ Victory-cap mass scales with the **square** of arena width, because victory radi
 fraction of arena width (`VICTORY_CAP_FRACTION = 0.375`, unchanged) and mass scales with
 radius². This is why Large isn't just "2× the game," it's closer to 4×.
 
-`WorldService`, `ThreeRenderer`, `BotPopulationService`, and `FoodSpawnerService` already accept
-`arenaWidth` as a parameter (confirmed in the Epic 1 codebase) — this is primarily a UI +
-wiring task (size-picker on Main Menu → threaded through `SessionState`'s bootstrap/Restart
-flow), not a new subsystem.
+`WorldService`, `BotPopulationService`, and `FoodSpawnerService` already accept `arenaWidth` as
+a constructor parameter and get freshly reconstructed with it on every Play/Restart (confirmed
+in the Epic 1 codebase, `SessionState.createFreshGameLoop()`) — threading a real UI choice into
+those three is a pure wiring task, not a new subsystem.
+
+`ThreeRenderer` is **not** in the same position, despite accepting `arenaWidth` too: it's
+constructed exactly once, in `bootstrap.ts`, *before* any menu/size choice can exist, and
+`SessionState` holds that one `IRenderer` instance for the app's entire lifetime — `Restart`
+rebuilds the world services above but always reuses the same renderer. There is currently no
+way to change the renderer's configured arena width (and therefore its rendered floor/rim
+size) after construction — `IRenderer`'s contract is just `init`/`render`/`resize`/`dispose`.
+Task 001 scopes the fix: add an explicit `IRenderer.setArenaWidth(width)` port method (see
+Architecture additions above) that `SessionState` calls before each Play/Restart, rather than
+assuming this is "just wiring" the way the three world-side services are.
 
 **Known risk, not pre-solved**: `TARGET_FOOD_COUNT` (food-spawner) and the bot population
 targets are fixed absolute counts, not scaled by arena area. A larger arena will feel sparser

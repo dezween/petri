@@ -1,12 +1,12 @@
 import type { Cell } from "./cell.entity";
-import type { Vector2 } from "./geometry";
 
 export type BotBehavior = "wanderer" | "hunter" | "fleer";
 
+/**
+ * Hunter/fleer steering is computed fresh every tick from scratch (pure functions over
+ * nearby entities) — there's no per-bot cached target or escape direction to store, so Bot
+ * carries no behavior-specific state beyond the shared Cell shape + its behavior tag.
+ */
 export interface Bot extends Cell {
   behavior: BotBehavior;
-  /** Hunter (006): id of the cell currently being chased. Unset when nothing is in range. */
-  targetId?: string;
-  /** Fleer (008): cached escape direction, recomputed each tick. */
-  fleeDirection?: Vector2;
 }

@@ -25,6 +25,12 @@ it with ad-hoc DOM show/hide calls elsewhere.
   the state machine's reachable-states graph beyond what's needed — Epic 1's doc comment on
   `session-state.ts` explicitly calls out that exactly 7 transitions are reachable; update that
   comment to reflect the new count once Settings is added, don't leave it stale and wrong.
+  **If Settings is implemented as a DOM-only modal overlay and deliberately never becomes a
+  `SessionStateName` member (no new entry in the `current`/`showOnly` switch) — a legitimate
+  reading of the "whichever fits better" choice above — then there is no new transition count
+  to document. In that case, update the doc comment to explicitly state the transition count is
+  unchanged *and why* (Settings is a modal, not a state-machine state), rather than leaving it
+  silently stale by omission.**
 
 ## Files touched
 

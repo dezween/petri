@@ -39,4 +39,5 @@ jobs:
             "petri-${GITHUB_REF_NAME}.zip" \
             "petri-${GITHUB_REF_NAME}.tar.gz" \
             --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+            --generate-notes \
+            --clobber

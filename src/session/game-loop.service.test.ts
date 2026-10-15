@@ -184,4 +184,58 @@ describe("GameLoopService", () => {
     expect(() => loop.stop()).not.toThrow();
     expect(scheduler.cancelFrame).not.toHaveBeenCalled();
   });
+
+  it("fires only onPlayerEaten, never onVictoryReached too, if a TickResult ever reported both in the same tick", () => {
+    // Structural guard: today WorldService's own invariants make this combination
+    // unreachable, but the loop must not rely on that alone — both flags true in one
+    // TickResult must still only ever fire one callback.
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService({ playerEaten: true, victoryReached: true });
+    const onPlayerEaten = vi.fn();
+    const onVictoryReached = vi.fn();
+    const loop = new GameLoopService(
+      createFakeInput(),
+      world,
+      createFakeRenderer(),
+      { onPlayerEaten, onVictoryReached },
+      scheduler,
+    );
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(onPlayerEaten).toHaveBeenCalledTimes(1);
+    expect(onVictoryReached).not.toHaveBeenCalled();
+  });
+
+  it("stopping one loop and starting a second on the same scheduler leaves only the second loop's callbacks firing", () => {
+    // Directly exercises the sequential stop-then-replace pattern SessionState.play() relies
+    // on for leak-free Restarts: constructing a second GameLoopService sharing the same
+    // scheduler after stopping the first must not let the first loop's frame fire again.
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const firstTick = vi.fn();
+    const secondTick = vi.fn();
+    const firstLoop = new GameLoopService(
+      createFakeInput(),
+      createFakeWorldService(),
+      createFakeRenderer(),
+      { onTick: firstTick },
+      scheduler,
+    );
+    const secondLoop = new GameLoopService(
+      createFakeInput(),
+      createFakeWorldService(),
+      createFakeRenderer(),
+      { onTick: secondTick },
+      scheduler,
+    );
+
+    firstLoop.start();
+    firstLoop.stop();
+    secondLoop.start();
+    fireNextFrame(16);
+
+    expect(firstTick).not.toHaveBeenCalled();
+    expect(secondTick).toHaveBeenCalledTimes(1);
+  });
 });

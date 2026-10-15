@@ -19,10 +19,10 @@ import { FoodSpawnerService } from "./food-spawner.service";
 
 export const DEFAULT_ARENA_WIDTH = 1000;
 
-/** Tunable: base player movement speed (units/sec) at mass=1. Tuned for real in task 027. */
+/** Tunable: base player movement speed (units/sec) at mass=1. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 const BASE_SPEED = 120;
 
-/** Tunable: base bot movement speed (units/sec) at mass=1 — slightly slower than the player so an equal-mass chase is survivable. Tuned for real in task 027. */
+/** Tunable: base bot movement speed (units/sec) at mass=1 — slightly slower than the player so an equal-mass chase is survivable. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 const BOT_BASE_SPEED = 100;
 
 export interface WorldSnapshot {
@@ -137,7 +137,7 @@ export class WorldService {
     return [this.player, ...this.bots.filter((b) => b.id !== bot.id), ...this.food];
   }
 
-  /** Speed decreases as mass grows — simple inverse-sqrt relationship, tuned for real in 027. Shared by player and bot movement so both scale the same way. */
+  /** Speed decreases as mass grows — simple inverse-sqrt relationship. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. Shared by player and bot movement so both scale the same way. */
   private applyMovement(
     entity: Cell,
     direction: Vector2,
@@ -182,28 +182,48 @@ export class WorldService {
    * scanning the same list with that larger radius — letting one bot's growing reach cascade
    * through a whole cluster of food in a single tick. That was mostly invisible at the old
    * RADIUS_PER_MASS_SQRT=2 (a radius gain of ~0.4 units per food), but after retuning it to
-   * 24 for the 027 balance pass (a ~5 unit gain per food) it became a severe correctness bug:
-   * a Playwright playtest showed a fresh bot reaching mass 30+ within about a second of
-   * session start, purely from chain-eating a food cluster, nowhere near real movement time.
-   * Mass still accumulates correctly across multiple eats in one tick (that part was never
-   * wrong) — only the radius used for *this tick's* overlap checks is now stable throughout.
+   * 24 (an intermediate overshoot attempt made during the 027 balance pass — the value that
+   * actually settled is 8, see cell.entity.ts for the full tuning history; a ~5 unit gain per
+   * food at R=24) it became a severe correctness bug: a Playwright playtest showed a fresh bot
+   * reaching mass 30+ within about a second of session start, purely from chain-eating a food
+   * cluster, nowhere near real movement time.
+   *
+   * Bug fix (follow-up): the same cascade risk existed on the *mass* side and was missed by
+   * the original 027 fix — `resolveEating()` was still being called with live, already-mutated
+   * `mass`, so a simultaneous multi-entity overlap (e.g. two bots overlapping the player in one
+   * tick) had an eat/die outcome that depended on iteration order of `this.bots` (whichever bot
+   * got evaluated first could tip the player's mass over the second bot's mass, or not, purely
+   * by array order). `mass` is now frozen alongside `radius` and the frozen snapshot is used
+   * for every `resolveEating()` *decision* — growth is still applied to the live object so mass
+   * correctly accumulates across multiple eats within the same tick, that part was never wrong.
    */
   private resolveCollisions(): boolean {
     let playerEaten = false;
     const startRadius = new Map<string, number>();
+    const startMass = new Map<string, number>();
     startRadius.set(this.player.id, this.player.radius);
-    for (const bot of this.bots) startRadius.set(bot.id, bot.radius);
+    startMass.set(this.player.id, this.player.mass);
+    for (const bot of this.bots) {
+      startRadius.set(bot.id, bot.radius);
+      startMass.set(bot.id, bot.mass);
+    }
     const frozen = (entity: Cell): Cell => {
       const radius = startRadius.get(entity.id);
-      return radius === undefined ? entity : { ...entity, radius };
+      const mass = startMass.get(entity.id);
+      return radius === undefined || mass === undefined
+        ? entity
+        : { ...entity, radius, mass };
     };
 
-    // Player vs bots.
+    // Player vs bots. Eating decisions use the frozen (start-of-tick) mass/radius snapshot
+    // so the outcome can't depend on which bot happens to be evaluated first; growth is still
+    // applied to the live `this.player`/`bot` objects so it accumulates across multiple eats.
     const eatenBotIds = new Set<string>();
     const frozenPlayer = frozen(this.player);
     for (const bot of this.bots) {
-      if (!isOverlapping(frozenPlayer, frozen(bot))) continue;
-      const result = resolveEating(this.player, bot);
+      const frozenBot = frozen(bot);
+      if (!isOverlapping(frozenPlayer, frozenBot)) continue;
+      const result = resolveEating(frozenPlayer, frozenBot);
       if (!result) continue;
       if (result.eaten.id === this.player.id) {
         playerEaten = true;
@@ -235,12 +255,18 @@ export class WorldService {
         const a = this.bots[i];
         const b = this.bots[j];
         if (eatenBotIds2.has(a.id) || eatenBotIds2.has(b.id)) continue;
-        if (!isOverlapping(frozen(a), frozen(b))) continue;
-        const result = resolveEating(a, b);
+        const frozenA = frozen(a);
+        const frozenB = frozen(b);
+        if (!isOverlapping(frozenA, frozenB)) continue;
+        const result = resolveEating(frozenA, frozenB);
         if (!result) continue;
-        result.eater.mass = growMass(result.eater.mass, result.eaten.mass);
-        result.eater.radius = massToRadius(result.eater.mass);
-        eatenBotIds2.add(result.eaten.id);
+        // Map the frozen eater/eaten back to the live `a`/`b` objects by id so growth is
+        // applied to (and future ticks see) the real mutable entity, not the frozen copy.
+        const eater = result.eater.id === a.id ? a : b;
+        const eaten = result.eater.id === a.id ? b : a;
+        eater.mass = growMass(eater.mass, eaten.mass);
+        eater.radius = clampRadiusToCap(massToRadius(eater.mass), this.arenaWidth);
+        eatenBotIds2.add(eaten.id);
       }
     }
 
@@ -252,7 +278,7 @@ export class WorldService {
         if (eatenFoodIds.has(food.id)) continue;
         if (!isOverlapping(frozenBot, food)) continue;
         bot.mass = growMass(bot.mass, food.mass);
-        bot.radius = massToRadius(bot.mass);
+        bot.radius = clampRadiusToCap(massToRadius(bot.mass), this.arenaWidth);
         eatenFoodIds.add(food.id);
       }
     }

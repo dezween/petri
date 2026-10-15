@@ -12,7 +12,9 @@ export class HudAdapter implements HudScreen {
   ) {}
 
   updateMass(mass: number): void {
-    this.massValueElement.textContent = String(Math.round(mass));
+    // Last line of defense before an upstream NaN (e.g. a division-by-zero bug) would
+    // otherwise render the literal string "NaN" to the player.
+    this.massValueElement.textContent = String(Number.isFinite(mass) ? Math.round(mass) : 0);
   }
 
   show(): void {

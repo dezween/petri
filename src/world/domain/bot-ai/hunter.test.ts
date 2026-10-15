@@ -39,8 +39,8 @@ describe("hunterMove", () => {
 
   it("never steers toward an entity equal or larger in mass", () => {
     const hunter = makeHunter({ mass: 10 });
-    // Both candidates are disqualified (one bigger, one equal) — the hunter has nothing
-    // to chase, so it must fall back to wander movement instead of targeting either.
+    // Both candidates are disqualified as prey (one bigger, one equal) — the hunter has
+    // nothing to chase, so it must fall back to wander movement instead of targeting either.
     const entities = [
       { id: "big", position: { x: 1, z: 0 }, mass: 20 },
       { id: "equal", position: { x: 0, z: 1 }, mass: 10 },
@@ -49,6 +49,27 @@ describe("hunterMove", () => {
     const direction = hunterMove(hunter, entities, 1 / 60);
 
     expect(Math.hypot(direction.x, direction.z)).toBeGreaterThan(0);
+    // Regression guard: the bigger "big" entity was explicitly disqualified as prey —
+    // the fallback must not re-target it just because it's the nearest thing within
+    // wander range. Pointing at (1, 0) would mean exactly that bug.
+    expect(direction).not.toEqual({ x: 1, z: 0 });
+  });
+
+  it("falls back to wandering toward a same-or-smaller entity, never the disqualified bigger one, when no valid prey is in range", () => {
+    const hunter = makeHunter({ mass: 10 });
+    // "big" is the *nearest* entity and sits well within wander range — if the fallback
+    // doesn't re-filter its candidate list, the hunter would steer straight at it despite
+    // it being too big to ever be chased as prey.
+    const entities = [
+      { id: "big", position: { x: 5, z: 0 }, mass: 20 },
+      { id: "safe", position: { x: 0, z: 50 }, mass: 10 },
+    ];
+
+    const direction = hunterMove(hunter, entities, 1 / 60);
+
+    // Must steer toward "safe" (0, 50), not "big" (5, 0).
+    expect(direction.x).toBeCloseTo(0, 5);
+    expect(direction.z).toBeCloseTo(50, 5);
   });
 
   it("behaves like a wanderer (keeps moving, never frozen) when nothing is in range", () => {

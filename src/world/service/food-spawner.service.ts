@@ -6,17 +6,19 @@ import type { Bot } from "../domain/bot.entity";
 import type { Food } from "../domain/food.entity";
 import { createFood, FOOD_MASS } from "../domain/food.entity";
 
-/** Target food count across the arena — the steady-density knob. Tuned for real in task 027. */
+/** Target food count across the arena — the steady-density knob. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 export const TARGET_FOOD_COUNT = 150;
 
-/** Seconds between a food particle being eaten and its replacement appearing. Tuned for real in task 027. */
+/** Seconds between a food particle being eaten and its replacement appearing. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 export const FOOD_RESPAWN_DELAY_SECONDS = 2;
 
 /**
  * Minimum distance a freshly spawned food particle must land from the player or any bot, so
  * it never spawns already-overlapping something that would eat it instantly off-screen.
- * Balance pass (027): bumped from 40 — after retuning RADIUS_PER_MASS_SQRT (cell.entity.ts,
- * 2 -> 24), a starting player's radius alone is ~76 units, well past the old buffer.
+ * Balance pass (027): bumped from 40 — RADIUS_PER_MASS_SQRT (cell.entity.ts) settled at 8
+ * (an intermediate overshoot attempt during 027 briefly tried 24, see cell.entity.ts for the
+ * full history), at which a starting player's radius alone (massToRadius(INITIAL_PLAYER_MASS))
+ * is ~40 units, well past the old buffer.
  */
 export const MIN_SPAWN_DISTANCE_FROM_ENTITY = 150;
 

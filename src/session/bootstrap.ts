@@ -5,6 +5,7 @@ import { HudAdapter } from "@/ui/adapter/dom/hud.adapter";
 import { MenuAdapter } from "@/ui/adapter/dom/menu.adapter";
 import { VictoryAdapter } from "@/ui/adapter/dom/victory.adapter";
 import { SessionState } from "@/ui/session-state";
+import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
 
 /**
  * Every DOM element the composition root needs, already resolved. Elements are looked up by
@@ -39,9 +40,17 @@ export interface BootstrappedApp {
  * and `ui/adapter` at once (per task 025's acceptance criteria) — everywhere else depends
  * only on the ports those adapters implement. Swapping `ThreeRenderer` for a no-op `IRenderer`
  * mock means changing only this function.
+ *
+ * `arenaWidth` is threaded into both `ThreeRenderer` (sizes the rendered floor/rim) and
+ * `SessionState` (sizes the `WorldService` it builds each Play/Restart) from this single
+ * parameter, so the two can never silently diverge the way they could when each independently
+ * fell back to its own same-valued default constant with no shared source of truth.
  */
-export function bootstrap(elements: BootstrapElements): BootstrappedApp {
-  const renderer = new ThreeRenderer();
+export function bootstrap(
+  elements: BootstrapElements,
+  arenaWidth: number = DEFAULT_ARENA_WIDTH,
+): BootstrappedApp {
+  const renderer = new ThreeRenderer(arenaWidth);
   renderer.init(elements.canvasContainer);
 
   const inputSource = new MouseInputAdapter(elements.canvasContainer);
@@ -65,6 +74,7 @@ export function bootstrap(elements: BootstrapElements): BootstrappedApp {
     inputSource,
     renderer,
     screens: { menu, hud, gameOver, victory },
+    arenaWidth,
   });
 
   return { sessionState, renderer };

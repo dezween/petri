@@ -25,6 +25,19 @@ function fakeModelCache(): ModelCache {
   return cache;
 }
 
+/** Mirrors the shape `player_cell.glb` had before its Blender script joined the membrane +
+ * nucleus objects: two sibling Meshes under one Group, neither nested inside the other. */
+function fakeMultiMeshModel(): THREE.Object3D {
+  const group = new THREE.Group();
+  group.add(
+    new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial()),
+  );
+  group.add(
+    new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 1), new THREE.MeshStandardMaterial()),
+  );
+  return group;
+}
+
 function bot(id: string, behavior: Bot["behavior"], x: number, radius: number): Bot {
   return { id, behavior, position: { x, z: 0 }, radius, mass: radius * radius };
 }
@@ -108,6 +121,17 @@ describe("CellMeshFactory", () => {
     const nonEmpty = instancedMeshes.filter((m) => m.count > 0);
     expect(nonEmpty).toHaveLength(2); // hunter's mesh and fleer's mesh each got exactly 1
     for (const mesh of nonEmpty) expect(mesh.count).toBe(1);
+  });
+
+  it("throws loudly (instead of silently dropping meshes) when a model contains more than one unjoined Mesh", () => {
+    // Regression test for the player_cell.glb bug: before its Blender script joined the
+    // membrane + nucleus objects into one mesh, the exported model had two sibling meshes
+    // and extractMesh() silently kept only the first one. extractMesh must now fail loudly
+    // instead, so this class of bug can't silently regress.
+    const cache = fakeModelCache();
+    cache.player_cell = fakeMultiMeshModel();
+
+    expect(() => new CellMeshFactory(cache)).toThrow(/2 meshes/);
   });
 
   it("reuses the same InstancedMesh objects across calls instead of rebuilding them", () => {

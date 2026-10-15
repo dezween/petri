@@ -3,7 +3,7 @@ import { distance } from "../geometry";
 import type { Bot } from "../bot.entity";
 import type { PositionedMass } from "./types";
 
-/** Tunable: how far a wanderer can "see" food to steer toward it. Tuned for real in 027. */
+/** Tunable: how far a wanderer can "see" food to steer toward it. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 export const WANDERER_FOOD_DETECTION_RADIUS = 150;
 
 /**
@@ -17,6 +17,7 @@ export function wandererMove(
   bot: Bot,
   nearbyFood: PositionedMass[],
   _deltaTime: number,
+  rng: () => number = Math.random,
 ): Vector2 {
   const target = findNearestWithinRadius(
     bot.position,
@@ -24,7 +25,7 @@ export function wandererMove(
     WANDERER_FOOD_DETECTION_RADIUS,
   );
   if (target) return directionTo(bot.position, target.position);
-  return randomDirection();
+  return randomDirection(rng);
 }
 
 /** Shared by hunter/fleer too — keeps "find closest qualifying candidate" in one place. */
@@ -50,7 +51,7 @@ export function directionTo(from: Vector2, to: Vector2): Vector2 {
   return { x: to.x - from.x, z: to.z - from.z };
 }
 
-function randomDirection(): Vector2 {
-  const angle = Math.random() * Math.PI * 2;
+function randomDirection(rng: () => number): Vector2 {
+  const angle = rng() * Math.PI * 2;
   return { x: Math.cos(angle), z: Math.sin(angle) };
 }

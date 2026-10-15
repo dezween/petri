@@ -20,6 +20,12 @@ describe("resolveEating", () => {
     const b = { id: "b", mass: 15 };
     expect(resolveEating(a, b)).toBeNull();
   });
+
+  it("returns null on equal zero mass, same as any other tie", () => {
+    const a = { id: "a", mass: 0 };
+    const b = { id: "b", mass: 0 };
+    expect(resolveEating(a, b)).toBeNull();
+  });
 });
 
 describe("growMass", () => {

@@ -3,7 +3,7 @@ import type { Bot } from "../bot.entity";
 import type { PositionedMass } from "./types";
 import { directionTo, findNearestWithinRadius, wandererMove } from "./wanderer";
 
-/** Tunable: how far a fleer can "see" a threat. Tuned for real in 027. */
+/** Tunable: how far a fleer can "see" a threat. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 export const FLEER_DETECTION_RADIUS = 180;
 
 /**
@@ -30,12 +30,13 @@ export function fleerMove(
   bot: Bot,
   nearbyEntities: PositionedMass[],
   deltaTime: number,
+  rng: () => number = Math.random,
 ): Vector2 {
   const threats = nearbyEntities.filter(
     (entity) => entity.id !== bot.id && entity.mass > bot.mass,
   );
   const threat = findNearestWithinRadius(bot.position, threats, FLEER_DETECTION_RADIUS);
-  if (!threat) return wandererMove(bot, nearbyEntities, deltaTime);
+  if (!threat) return wandererMove(bot, nearbyEntities, deltaTime, rng);
 
   const away = normalize(directionTo(threat.position, bot.position));
   const towardEdge = directionToNearestEdge(bot.position);

@@ -73,9 +73,12 @@ export class SessionState {
   }
 
   private play(): void {
-    // Idempotent even though every path here should already have a stopped loop —
-    // GameLoopService.stop() is a documented no-op when not running.
-    this.gameLoop?.stop();
+    // Defensive state guard: the only thing normally preventing e.g. a second Play click
+    // while already Playing is the menu screen's `hidden` DOM attribute — and this exact
+    // codebase has already shipped one real bug where `[hidden]` was overridden by CSS,
+    // letting a "hidden" element still intercept events. Don't rely on DOM enforcement alone.
+    if (this.current === "Playing") return;
+    this.stopLoop();
     this.gameLoop = this.createFreshGameLoop();
     this.current = "Playing";
     this.showOnly("Playing");
@@ -83,22 +86,32 @@ export class SessionState {
   }
 
   private returnToMainMenu(): void {
-    this.gameLoop?.stop();
-    this.gameLoop = null;
+    if (this.current === "MainMenu") return;
+    this.stopLoop();
     this.current = "MainMenu";
     this.showOnly("MainMenu");
   }
 
   private enterGameOver(finalMass: number): void {
-    this.gameLoop?.stop();
+    if (this.current === "GameOver") return;
+    this.stopLoop();
     this.current = "GameOver";
     this.showOnly("GameOver", finalMass);
   }
 
   private enterVictory(finalMass: number): void {
-    this.gameLoop?.stop();
+    if (this.current === "Victory") return;
+    this.stopLoop();
     this.current = "Victory";
     this.showOnly("Victory", finalMass);
+  }
+
+  /** Stops (idempotent — GameLoopService.stop() is a documented no-op when not running) and
+   * nulls out the current loop, so `this.gameLoop`'s nullness alone always tells a reader
+   * whether a game is in progress — not left pointing at a stale, already-stopped instance. */
+  private stopLoop(): void {
+    this.gameLoop?.stop();
+    this.gameLoop = null;
   }
 
   /** Builds a brand-new world end to end — new player, fresh bot/food population — so Restart never continues stale state. */
@@ -124,9 +137,13 @@ export class SessionState {
 
   private showOnly(which: SessionStateName, finalMass = 0): void {
     const { menu, hud, gameOver, victory } = this.deps.screens;
-    which === "MainMenu" ? menu.show() : menu.hide();
-    which === "Playing" ? hud.show() : hud.hide();
-    which === "GameOver" ? gameOver.show(finalMass) : gameOver.hide();
-    which === "Victory" ? victory.show(finalMass) : victory.hide();
+    if (which === "MainMenu") menu.show();
+    else menu.hide();
+    if (which === "Playing") hud.show();
+    else hud.hide();
+    if (which === "GameOver") gameOver.show(finalMass);
+    else gameOver.hide();
+    if (which === "Victory") victory.show(finalMass);
+    else victory.hide();
   }
 }

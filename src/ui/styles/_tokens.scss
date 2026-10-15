@@ -11,14 +11,21 @@
   --color-rim: #aad4cc;
 
   --color-text: #1f2d2a;
-  --color-text-muted: rgba(31, 45, 42, 0.65);
+  // WCAG AA requires >= 4.5:1 for normal-weight text; the original 0.65 alpha landed at
+  // ~4.38:1 against --color-bg/the near-white --glass-bg blend (a narrow fail). Bumping to
+  // 0.72 clears 4.5:1 with no perceptible color shift.
+  --color-text-muted: rgba(31, 45, 42, 0.72);
 
   --color-accent: #3fae94;
   --color-accent-dark: #1f6f5c;
   --color-accent-hover: #359c84;
 
   --color-danger: #c65b3c;
-  --color-victory: #b8860b;
+  // WCAG AA requires >= 3:1 for large/bold text (used on .screen__title). The original
+  // #b8860b landed at ~2.81:1 against the light backgrounds this is shown over — a real,
+  // measurable AA failure on the one screen a successful player always sees. Darkened to
+  // bring luminance down into AA range (~4.3:1) while keeping the same hue.
+  --color-victory: #8a6508;
 
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-border: rgba(255, 255, 255, 0.4);

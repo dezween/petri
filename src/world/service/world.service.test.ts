@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WorldService, DEFAULT_ARENA_WIDTH } from "./world.service";
 import type { Player } from "../domain/cell.entity";
-import { massToRadius } from "../domain/cell.entity";
+import { massToRadius, radiusToMass } from "../domain/cell.entity";
 import type { Bot } from "../domain/bot.entity";
 import type { Food } from "../domain/food.entity";
 import { VICTORY_CAP_FRACTION } from "../domain/rules";
@@ -147,12 +147,51 @@ describe("WorldService.tick — collisions", () => {
 
     expect(world.getSnapshot().bots).toHaveLength(1);
   });
+
+  it("resolves a simultaneous multi-entity overlap deterministically, independent of array order", () => {
+    // Player (mass 10) is simultaneously overlapped by a smaller bot (8) and a bigger bot
+    // (15) in the same tick. The outcome must depend only on the frozen start-of-tick
+    // masses, never on which bot happens to be evaluated first in `this.bots`.
+    const run = (bots: Bot[]) => {
+      const player = makePlayer({ mass: 10, position: { x: 0, z: 0 } });
+      const world = new WorldService(player, bots, []);
+      const result = world.tick(1 / 60, { x: 0, z: 0 });
+      return { result, snapshot: world.getSnapshot() };
+    };
+
+    const smaller = () => makeBot({ id: "smaller", mass: 8, position: { x: 0, z: 0 } });
+    const bigger = () => makeBot({ id: "bigger", mass: 15, position: { x: 0, z: 0 } });
+
+    const orderAB = run([smaller(), bigger()]);
+    const orderBA = run([bigger(), smaller()]);
+
+    expect(orderAB.result.playerEaten).toBe(true);
+    expect(orderBA.result.playerEaten).toBe(true);
+    expect(orderAB.result.playerEaten).toBe(orderBA.result.playerEaten);
+  });
+
+  it("caps a bot's radius at the victory-cap fraction, instead of letting it grow past the arena and snap to center", () => {
+    const player = makePlayer({ position: { x: 500, z: 500 } }); // far away, uninvolved
+    // Bot already near the cap; eating one more large bot should clamp its radius rather
+    // than let it exceed the arena's own radius.
+    const cap = DEFAULT_ARENA_WIDTH * VICTORY_CAP_FRACTION;
+    const nearCapMass = radiusToMass(cap) - 1;
+    const bigBot = makeBot({ id: "big", mass: nearCapMass, position: { x: 0, z: 0 } });
+    const smallBot = makeBot({ id: "small", mass: 1, position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [bigBot, smallBot], []);
+
+    world.tick(1 / 60, { x: 0, z: 0 });
+
+    const snapshot = world.getSnapshot();
+    expect(snapshot.bots).toHaveLength(1);
+    expect(snapshot.bots[0]!.radius).toBeLessThanOrEqual(cap);
+  });
 });
 
 describe("WorldService.tick — victory cap", () => {
   it("reports victoryReached once the player's radius hits the cap", () => {
     const cap = DEFAULT_ARENA_WIDTH * VICTORY_CAP_FRACTION;
-    const massAtCap = (cap / 2) ** 2; // inverse of massToRadius with RADIUS_PER_MASS_SQRT=2
+    const massAtCap = radiusToMass(cap); // inverse of massToRadius at the real constant
     const player = makePlayer({ mass: massAtCap, position: { x: 0, z: 0 } });
     const world = new WorldService(player, [], []);
 

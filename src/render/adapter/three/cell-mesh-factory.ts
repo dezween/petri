@@ -21,6 +21,11 @@ const BASE_MODEL_RADIUS: Record<ModelName, number> = {
   player_cell: 1.0,
   bot_wanderer: 1.0,
   bot_hunter: 0.5,
+  // 0.8 is the central body sphere's radius only (tools/blender/generate_bot_fleer.py) — the
+  // joined mesh's 6 spike/flagella protrusions extend visually beyond it (positioned at
+  // radius 0.9 from center, depth 0.5 each). Not a correctness bug since the spikes scale
+  // proportionally with the body at every zoom level, but this is not a tight bounding
+  // radius — don't assume it is when retuning scale-related constants.
   bot_fleer: 0.8,
   food: 0.25,
 };
@@ -41,16 +46,31 @@ interface ExtractedModel {
   material: THREE.Material | THREE.Material[];
 }
 
-/** Pulls the first mesh's geometry/material out of a loaded (possibly nested) model scene. */
+/**
+ * Pulls the single mesh's geometry/material out of a loaded (possibly nested) model scene.
+ * Every `tools/blender/generate_*.py` script joins its multi-part models into one mesh with
+ * multiple material slots before export (glTF preserves per-face material slots across a
+ * join) specifically so there's exactly one `THREE.Mesh` per model here. Throws rather than
+ * silently picking "the first mesh found" if that invariant is ever violated — a model with
+ * N>1 unjoined meshes would otherwise have N-1 of them silently dropped with no warning (this
+ * class of bug previously affected `player_cell.glb` before its Blender script joined its
+ * membrane + nucleus objects; see cell-mesh-factory.test.ts for the regression test).
+ */
 function extractMesh(model: THREE.Object3D): ExtractedModel {
-  let found: THREE.Mesh | undefined;
+  const meshes: THREE.Mesh[] = [];
   model.traverse((child) => {
-    if (!found && child instanceof THREE.Mesh) found = child;
+    if (child instanceof THREE.Mesh) meshes.push(child);
   });
-  if (!found) {
+  if (meshes.length === 0) {
     throw new Error("Model contains no Mesh to instance");
   }
-  return { geometry: found.geometry, material: found.material };
+  if (meshes.length > 1) {
+    throw new Error(
+      `Model contains ${meshes.length} meshes; extractMesh only instances the first one — ` +
+        "join into a single mesh in Blender, or extend CellMeshFactory to support multi-mesh models.",
+    );
+  }
+  return { geometry: meshes[0].geometry, material: meshes[0].material };
 }
 
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -77,26 +97,36 @@ function composeAt(
 export class CellMeshFactory {
   readonly group = new THREE.Group();
 
-  private readonly playerMesh: THREE.Mesh;
-  private readonly foodMesh: THREE.InstancedMesh;
-  private readonly botMeshes: Record<BotBehavior, THREE.InstancedMesh>;
+  // Each is left unset (rather than throwing) when its model failed to load — see
+  // `model-loader.ts`'s `loadAllModels` doc comment. A missing model means that one entity
+  // type just never renders; it no longer takes every other entity type down with it.
+  private readonly playerMesh?: THREE.Mesh;
+  private readonly foodMesh?: THREE.InstancedMesh;
+  private readonly botMeshes: Partial<Record<BotBehavior, THREE.InstancedMesh>> = {};
 
   constructor(models: ModelCache) {
-    const player = extractMesh(models.player_cell);
-    this.playerMesh = new THREE.Mesh(player.geometry, player.material);
-    this.group.add(this.playerMesh);
+    if (models.player_cell) {
+      const player = extractMesh(models.player_cell);
+      this.playerMesh = new THREE.Mesh(player.geometry, player.material);
+      this.group.add(this.playerMesh);
+    }
 
-    const food = extractMesh(models.food);
-    this.foodMesh = new THREE.InstancedMesh(food.geometry, food.material, MAX_FOOD_INSTANCES);
-    this.foodMesh.count = 0;
-    this.group.add(this.foodMesh);
+    if (models.food) {
+      const food = extractMesh(models.food);
+      this.foodMesh = new THREE.InstancedMesh(food.geometry, food.material, MAX_FOOD_INSTANCES);
+      this.foodMesh.count = 0;
+      this.group.add(this.foodMesh);
+    }
 
-    this.botMeshes = {
-      wanderer: this.createBotInstancedMesh(models.bot_wanderer),
-      hunter: this.createBotInstancedMesh(models.bot_hunter),
-      fleer: this.createBotInstancedMesh(models.bot_fleer),
-    };
-    for (const mesh of Object.values(this.botMeshes)) this.group.add(mesh);
+    for (const [behavior, modelName] of Object.entries(BOT_MODEL_FOR_BEHAVIOR) as Array<
+      [BotBehavior, ModelName]
+    >) {
+      const model = models[modelName];
+      if (!model) continue;
+      const mesh = this.createBotInstancedMesh(model);
+      this.botMeshes[behavior] = mesh;
+      this.group.add(mesh);
+    }
   }
 
   private createBotInstancedMesh(model: THREE.Object3D): THREE.InstancedMesh {
@@ -113,12 +143,14 @@ export class CellMeshFactory {
   }
 
   private updatePlayer(player: WorldSnapshot["player"]): void {
+    if (!this.playerMesh) return; // player_cell model failed to load — nothing to update
     this.playerMesh.position.set(player.position.x, 0, player.position.z);
     const scale = radiusToScale(player.radius, "player_cell");
     this.playerMesh.scale.setScalar(scale);
   }
 
   private updateFood(food: WorldSnapshot["food"]): void {
+    if (!this.foodMesh) return; // food model failed to load — nothing to update
     const count = Math.min(food.length, MAX_FOOD_INSTANCES);
     const matrix = new THREE.Matrix4();
     for (let i = 0; i < count; i++) {
@@ -137,6 +169,7 @@ export class CellMeshFactory {
     const matrix = new THREE.Matrix4();
     for (const behavior of Object.keys(byBehavior) as BotBehavior[]) {
       const mesh = this.botMeshes[behavior];
+      if (!mesh) continue; // this behavior's model failed to load — nothing to update
       const list = byBehavior[behavior];
       const count = Math.min(list.length, MAX_BOTS_PER_BEHAVIOR);
       const model = BOT_MODEL_FOR_BEHAVIOR[behavior];
@@ -152,9 +185,14 @@ export class CellMeshFactory {
   }
 
   dispose(): void {
-    this.playerMesh.geometry.dispose();
-    disposeMaterial(this.playerMesh.material);
-    for (const mesh of [this.foodMesh, ...Object.values(this.botMeshes)]) {
+    if (this.playerMesh) {
+      this.playerMesh.geometry.dispose();
+      disposeMaterial(this.playerMesh.material);
+    }
+    const instancedMeshes = [this.foodMesh, ...Object.values(this.botMeshes)].filter(
+      (mesh): mesh is THREE.InstancedMesh => mesh !== undefined,
+    );
+    for (const mesh of instancedMeshes) {
       mesh.geometry.dispose();
       disposeMaterial(mesh.material);
       mesh.dispose();
@@ -162,6 +200,14 @@ export class CellMeshFactory {
   }
 }
 
+/**
+ * NOTE: `THREE.Material.dispose()` does not cascade to any texture properties (`map`,
+ * `normalMap`, `roughnessMap`, etc.) bound to that material — those must be disposed
+ * separately. Not a live leak today: every `tools/blender/generate_*.py` script uses flat
+ * Principled-BSDF colors via `make_material()`, with no image-texture nodes, so there are no
+ * `THREE.Texture` instances to leak currently. If/when a textured model is introduced, extend
+ * this function to also dispose any texture-valued properties on the material.
+ */
 function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
   if (Array.isArray(material)) {
     for (const m of material) m.dispose();

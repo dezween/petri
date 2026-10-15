@@ -55,7 +55,13 @@ export class MouseInputAdapter implements IInputSource {
     return this.direction;
   }
 
-  /** Stops listening. Not part of IInputSource — session/UI calls this directly on teardown. */
+  /**
+   * Stops listening. Not part of IInputSource — session/UI calls this directly on teardown.
+   * Intentionally unreachable in the current wiring (this app never tears down its one
+   * long-lived instance) — kept alive by this class's own tests only, until the app gains a
+   * real teardown path (HMR support, embeddable widget use case, etc.). Not dead code to
+   * delete; a future lint/dead-code pass just won't have call-site context for it yet.
+   */
   dispose(): void {
     this.container.removeEventListener("pointermove", this.handlePointerMove);
   }

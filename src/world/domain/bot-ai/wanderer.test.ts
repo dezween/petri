@@ -50,4 +50,14 @@ describe("wandererMove", () => {
 
     expect(Math.hypot(direction.x, direction.z)).toBeGreaterThan(0);
   });
+
+  it("picks a deterministic random-fallback direction when given an injectable rng", () => {
+    const bot = makeBot({ position: { x: 0, z: 0 } });
+    const rng = () => 0.25; // angle = 0.25 * 2*PI = PI/2 -> (cos, sin) = (0, 1)
+
+    const direction = wandererMove(bot, [], 1 / 60, rng);
+
+    expect(direction.x).toBeCloseTo(0, 5);
+    expect(direction.z).toBeCloseTo(1, 5);
+  });
 });

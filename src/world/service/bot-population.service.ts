@@ -4,14 +4,16 @@ import { massToRadius } from "../domain/cell.entity";
 import type { Player } from "../domain/cell.entity";
 import type { Bot, BotBehavior } from "../domain/bot.entity";
 
-/** Starting mass for every freshly spawned bot. Tuned for real in task 027. */
+/** Starting mass for every freshly spawned bot. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
 export const INITIAL_BOT_MASS = 5;
 
 /**
  * Minimum distance a freshly (re)spawned bot must land from the player, so a respawn never
- * ambushes someone standing still. Balance pass (027): bumped from 150 — after retuning
- * RADIUS_PER_MASS_SQRT (cell.entity.ts, 2 -> 24), starting player + bot radii alone sum to
- * ~130 units, leaving almost no buffer at the old value.
+ * ambushes someone standing still. Balance pass (027): bumped from 150 — RADIUS_PER_MASS_SQRT
+ * (cell.entity.ts) settled at 8 (an intermediate overshoot attempt during 027 briefly tried 24,
+ * see cell.entity.ts for the full history), at which starting player + bot radii alone
+ * (massToRadius(INITIAL_PLAYER_MASS) + massToRadius(INITIAL_BOT_MASS)) sum to ~58 units,
+ * leaving almost no buffer at the old value.
  */
 export const MIN_SPAWN_DISTANCE_FROM_PLAYER = 250;
 
@@ -30,9 +32,10 @@ export interface PopulationConfig {
 }
 
 /**
- * Named, tunable thresholds per task 009 — the real numbers are a balancing exercise for
- * task 027, not a decision to get right here. Three tiers: a light start, a mid-game bump
- * in both count and hunter aggressiveness, and a late-game tier for a maxed-out player.
+ * Named, tunable thresholds per task 009. Not revisited during the 027 balance pass — these
+ * specific numbers are still a rough guess, revisit if real playtesting suggests otherwise.
+ * Three tiers: a light start, a mid-game bump in both count and hunter aggressiveness, and a
+ * late-game tier for a maxed-out player.
  */
 export const DEFAULT_POPULATION_CONFIG: PopulationConfig = {
   respawnDelaySeconds: 3,

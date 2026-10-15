@@ -74,12 +74,17 @@ export class GameLoopService {
     this.renderer.render(snapshot);
     this.callbacks.onTick?.(snapshot);
 
+    // Structurally exclusive regardless of what TickResult says: today this is unreachable
+    // in practice (playerEaten requires the player to be the smaller cell in a collision,
+    // victoryReached requires the player's radius to already be at the arena cap — an
+    // implicit game-rule invariant WorldService enforces, not something this loop or the
+    // state machine itself guarantees). Guarding here too means a future WorldService change
+    // that violates that invariant can't silently fire both callbacks in the same tick and
+    // transition GameOver -> Victory within one synchronous call.
     if (result.playerEaten && !this.hasFiredPlayerEaten) {
       this.hasFiredPlayerEaten = true;
       this.callbacks.onPlayerEaten?.();
-    }
-
-    if (result.victoryReached && !this.hasFiredVictory) {
+    } else if (result.victoryReached && !this.hasFiredVictory) {
       this.hasFiredVictory = true;
       this.callbacks.onVictoryReached?.();
     }

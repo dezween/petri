@@ -7,9 +7,9 @@ this is planning only.
 
 - [ ] [001 — Arena size parameter threading](tasks/001-arena-size-parameter-threading.md)
 - [ ] [002 — Main menu size-picker UI](tasks/002-main-menu-size-picker.md)
-- [ ] [003 — Audio port + adapter](tasks/003-audio-port-and-adapter.md)
+- [ ] [003 — Audio Port + Adapter](tasks/003-audio-port-and-adapter.md)
 - [ ] [004 — Sound effects wired to game events](tasks/004-sound-effects-wiring.md)
-- [ ] [005 — Background ambient/music loop](tasks/005-background-music-loop.md)
+- [ ] [005 — Background Ambient / Music Loop](tasks/005-background-music-loop.md)
 - [ ] [006 — Settings screen UI + localStorage persistence](tasks/006-settings-screen-ui.md)
 - [ ] [007 — Wire settings screen into the UI state machine](tasks/007-settings-in-state-machine.md)
 - [ ] [008 — Particle effect system (render module)](tasks/008-particle-effect-system.md)

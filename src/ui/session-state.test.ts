@@ -170,9 +170,10 @@ describe("SessionState", () => {
 
     expect(session.state).toBe("MainMenu");
     expect(hud.hide).toHaveBeenCalledTimes(3); // MainMenu init + GameOver entry + MainMenu return (hud hidden every time)
-    // stop() is called defensively on every transition into a non-Playing state, even
-    // though GameLoopService.stop() is a documented idempotent no-op when already stopped.
-    expect(gameLoopInstances[0]!.stop).toHaveBeenCalledTimes(2);
+    // stop() + null-out happens once, at the GameOver transition — stopLoop() nulls
+    // this.gameLoop, so the later MainMenu transition's stopLoop() call finds it already
+    // null and doesn't re-invoke .stop() on the same (already-stopped) instance again.
+    expect(gameLoopInstances[0]!.stop).toHaveBeenCalledTimes(1);
   });
 
   it("Victory Restart and MainMenu behave identically to GameOver's", () => {
@@ -208,6 +209,28 @@ describe("SessionState", () => {
     const { session } = setup();
     // No firePlay() call — no loop exists yet, so there is no callbacks object to invoke at all.
     expect(gameLoopInstances).toHaveLength(0);
+    expect(session.state).toBe("MainMenu");
+  });
+
+  it("ignores a redundant Play while already Playing instead of tearing down and rebuilding the active game", () => {
+    // Defensive guard for when DOM-only [hidden] enforcement fails (this project has shipped
+    // exactly that bug once already) and a "hidden" Play button's click still reaches here.
+    const { session, menu } = setup();
+    menu.firePlay();
+    expect(gameLoopInstances).toHaveLength(1);
+
+    menu.firePlay(); // simulates a second Play invocation while already Playing
+
+    expect(session.state).toBe("Playing");
+    expect(gameLoopInstances).toHaveLength(1); // no second loop was created
+    expect(gameLoopInstances[0]!.stop).not.toHaveBeenCalled();
+  });
+
+  it("ignores a redundant MainMenu transition while already in MainMenu", () => {
+    const { session, gameOver } = setup();
+    // Already MainMenu at construction — firing a MainMenu handler with no active game
+    // must not throw or do anything observable.
+    expect(() => gameOver.fireMainMenu()).not.toThrow();
     expect(session.state).toBe("MainMenu");
   });
 });
