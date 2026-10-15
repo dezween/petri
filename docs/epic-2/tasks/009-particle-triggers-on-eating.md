@@ -14,6 +14,17 @@ world.service.ts`'s `tick()`/`TickResult` shape and `src/session/game-loop.servi
 callbacks first; Epic 1's `TickResult` may already surface which entities were eaten this tick
 (check before assuming it needs to be added from scratch).
 
+**Already checked (code review, pre-Epic-2):** the answer is no — `TickResult` is currently
+exactly `{ playerEaten: boolean; victoryReached: boolean }`, no per-entity data at all.
+`resolveCollisions()` *does* compute `eatenBotIds`/`eatenFoodIds`/`eatenBotIds2` locally each
+tick, but only to drive the `.filter()` calls that remove eaten entities from the live arrays —
+none of that (which entity, its position, its type/color) is retained or exposed anywhere.
+Building this hook is a real, non-trivial change to `tick()`/`TickResult`'s shape — capturing
+id + position + (bot behavior or food, for burst-color choice) for every entity eaten that
+tick, across all four collision sub-loops (player-vs-bot, player-vs-food, bot-vs-bot,
+bot-vs-food) — not a small wiring change on top of an existing hook. Whichever of 004/009 lands
+first should budget for that, not assume there's a shortcut already in place.
+
 ## Detailed steps
 
 - Identify (or add, if task 004 didn't already) the point where `WorldService.tick()` knows
