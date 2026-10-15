@@ -152,6 +152,21 @@ describe("GameLoopService", () => {
     expect(onVictoryReached).not.toHaveBeenCalled();
   });
 
+  it("fires onTick every frame with the same snapshot passed to the renderer", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService();
+    const renderer = createFakeRenderer();
+    const onTick = vi.fn();
+    const loop = new GameLoopService(createFakeInput(), world, renderer, { onTick }, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+    fireNextFrame(32);
+
+    expect(onTick).toHaveBeenCalledTimes(2);
+    expect(onTick).toHaveBeenCalledWith(fakeSnapshot);
+  });
+
   it("start() is a no-op when already running — doesn't schedule a second loop", () => {
     const { scheduler } = createFakeScheduler();
     const loop = new GameLoopService(createFakeInput(), createFakeWorldService(), createFakeRenderer(), {}, scheduler);

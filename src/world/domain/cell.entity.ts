@@ -24,3 +24,11 @@ export interface Cell {
 
 /** A player is structurally identical to a Cell — no behavior field, no skills. */
 export type Player = Cell;
+
+/** Starting mass for a freshly created player. Slightly above INITIAL_BOT_MASS so a new session doesn't start pre-eaten by a same-tick spawn. Tuned for real in task 027. */
+export const INITIAL_PLAYER_MASS = 10;
+
+/** Builds a fresh player at session start or Restart — the only place a Player should be constructed. */
+export function createPlayer(id: string, position: Vector2): Player {
+  return { id, position, mass: INITIAL_PLAYER_MASS, radius: massToRadius(INITIAL_PLAYER_MASS) };
+}

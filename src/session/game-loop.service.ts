@@ -1,10 +1,12 @@
 import type { IInputSource } from "@/input/port/input.port";
 import type { IRenderer } from "@/render/port/renderer.port";
-import type { WorldService } from "@/world/service/world.service";
+import type { WorldService, WorldSnapshot } from "@/world/service/world.service";
 
 export interface GameLoopCallbacks {
   onPlayerEaten?: () => void;
   onVictoryReached?: () => void;
+  /** Fired every frame with the same snapshot passed to the renderer — e.g. for a HUD to read live mass. */
+  onTick?: (snapshot: WorldSnapshot) => void;
 }
 
 /**
@@ -68,7 +70,9 @@ export class GameLoopService {
 
     const direction = this.inputSource.getDirection();
     const result = this.worldService.tick(deltaTime, direction);
-    this.renderer.render(this.worldService.getSnapshot());
+    const snapshot = this.worldService.getSnapshot();
+    this.renderer.render(snapshot);
+    this.callbacks.onTick?.(snapshot);
 
     if (result.playerEaten && !this.hasFiredPlayerEaten) {
       this.hasFiredPlayerEaten = true;
