@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run build
+
+      - name: Package build artifacts
+        run: |
+          cd dist
+          zip -r "../petri-${GITHUB_REF_NAME}.zip" .
+          cd ..
+          tar -czf "petri-${GITHUB_REF_NAME}.tar.gz" -C dist .
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "petri-${GITHUB_REF_NAME}.zip" \
+            "petri-${GITHUB_REF_NAME}.tar.gz" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
