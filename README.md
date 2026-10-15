@@ -19,6 +19,7 @@ make dev       # starts the Vite dev server (http://localhost:5173)
 ```bash
 make build     # production build into dist/
 make preview   # serve the production build locally
+make clean     # remove node_modules, dist, and Blender's __pycache__
 ```
 
 ## Regenerate the 3D models

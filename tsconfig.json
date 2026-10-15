@@ -19,5 +19,9 @@
       "@/*": ["src/*"]
     }
   },
+  // Deliberately scoped to "src" only — vite.config.ts (which imports from "node:url") is
+  // intentionally outside this type-checked scope. It's a one-line config file unlikely to
+  // regress silently; including root config files would require adding @types/node for no
+  // real safety benefit today.
   "include": ["src"]
 }

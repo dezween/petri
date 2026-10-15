@@ -9,6 +9,11 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # Minimal explicit permissions: this job only checks out code and uploads a build
+    # artifact, and runs on every PR (including from forks, via pull_request), so its
+    # GITHUB_TOKEN shouldn't silently inherit a broader repo/org default.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

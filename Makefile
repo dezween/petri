@@ -27,4 +27,4 @@ blender-models:
 	done
 
 clean:
-	rm -rf node_modules dist
+	rm -rf node_modules dist tools/blender/__pycache__
