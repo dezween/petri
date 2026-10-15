@@ -45,7 +45,7 @@ export interface SessionStateDeps {
 }
 
 /**
- * The MainMenu/Playing/GameOver/Victory state machine from docs/SPEC.md. Owns the only
+ * The MainMenu/Playing/GameOver/Victory state machine from docs/epic-1/SPEC.md. Owns the only
  * transition logic in this codebase — screens are dumb (DOM + registration hooks), this
  * class is the one place that decides what happens next and drives the game loop.
  *

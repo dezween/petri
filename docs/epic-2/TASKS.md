@@ -1,0 +1,24 @@
+# Epic 2 Tasks
+
+Strict build order — each task depends only on strictly lower-numbered tasks. Separate
+numbering namespace from Epic 1 (restarts at 001). See `docs/epic-2/SPEC.md` for the full
+design decisions and Out of Scope list these tasks implement. Nothing here is implemented yet —
+this is planning only.
+
+- [ ] [001 — Arena size parameter threading](tasks/001-arena-size-parameter-threading.md)
+- [ ] [002 — Main menu size-picker UI](tasks/002-main-menu-size-picker.md)
+- [ ] [003 — Audio port + adapter](tasks/003-audio-port-and-adapter.md)
+- [ ] [004 — Sound effects wired to game events](tasks/004-sound-effects-wiring.md)
+- [ ] [005 — Background ambient/music loop](tasks/005-background-music-loop.md)
+- [ ] [006 — Settings screen UI + localStorage persistence](tasks/006-settings-screen-ui.md)
+- [ ] [007 — Wire settings screen into the UI state machine](tasks/007-settings-in-state-machine.md)
+- [ ] [008 — Particle effect system (render module)](tasks/008-particle-effect-system.md)
+- [ ] [009 — Wire particle triggers to eating events](tasks/009-particle-triggers-on-eating.md)
+- [ ] [010 — Lab-bench background ground plane](tasks/010-lab-bench-background.md)
+- [ ] [011 — Blender scripts for decorative static props](tasks/011-blender-decorative-props.md)
+- [ ] [012 — Place static props in the scene](tasks/012-place-static-props-in-scene.md)
+- [ ] [013 — Depth-of-field / blur post-processing](tasks/013-depth-of-field-postprocessing.md)
+- [ ] [014 — Bloom post-processing](tasks/014-bloom-postprocessing.md)
+- [ ] [015 — Accessible bot color palette](tasks/015-accessible-bot-palette.md)
+- [ ] [016 — Epic 2 playtest & balance pass](tasks/016-playtest-balance-pass.md)
+- [ ] [017 — Update README for Epic 2](tasks/017-readme-update.md)
