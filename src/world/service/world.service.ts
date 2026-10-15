@@ -15,6 +15,7 @@ import { wandererMove } from "../domain/bot-ai/wanderer";
 import { hunterMove } from "../domain/bot-ai/hunter";
 import { fleerMove } from "../domain/bot-ai/fleer";
 import { BotPopulationService } from "./bot-population.service";
+import { FoodSpawnerService } from "./food-spawner.service";
 
 export const DEFAULT_ARENA_WIDTH = 1000;
 
@@ -53,6 +54,7 @@ export class WorldService {
     food: Food[] = [],
     arenaWidth: number = DEFAULT_ARENA_WIDTH,
     private readonly populationService?: BotPopulationService,
+    private readonly foodSpawnerService?: FoodSpawnerService,
   ) {
     this.player = player;
     this.bots = bots;
@@ -83,6 +85,17 @@ export class WorldService {
         this.arenaWidth,
       );
       if (spawned.length > 0) this.bots.push(...spawned);
+    }
+
+    if (this.foodSpawnerService) {
+      const spawned = this.foodSpawnerService.update(
+        this.food,
+        this.player,
+        this.bots,
+        deltaTime,
+        this.arenaWidth,
+      );
+      if (spawned.length > 0) this.food.push(...spawned);
     }
 
     return { playerEaten, victoryReached };
