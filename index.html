@@ -6,6 +6,31 @@
     <title>Project</title>
   </head>
   <body>
+    <div id="menu-screen" class="screen" hidden>
+      <h1 class="screen__title">Petri</h1>
+      <p class="screen__instructions">Move with your cursor. Eat smaller cells. Avoid bigger ones.</p>
+      <button id="menu-play-button" type="button" class="screen__button">Play</button>
+    </div>
+
+    <div id="hud-overlay" class="hud" hidden>
+      <span class="hud__label">Mass</span>
+      <span id="hud-mass-value" class="hud__value">0</span>
+    </div>
+
+    <div id="game-over-screen" class="screen" hidden>
+      <h1 class="screen__title">Game Over</h1>
+      <p class="screen__score">Final mass: <span id="game-over-score-value">0</span></p>
+      <button id="game-over-restart-button" type="button" class="screen__button">Restart</button>
+      <button id="game-over-menu-button" type="button" class="screen__button screen__button--secondary">Main Menu</button>
+    </div>
+
+    <div id="victory-screen" class="screen" hidden>
+      <h1 class="screen__title">You've consumed the entire dish!</h1>
+      <p class="screen__score">Final mass: <span id="victory-score-value">0</span></p>
+      <button id="victory-restart-button" type="button" class="screen__button">Restart</button>
+      <button id="victory-menu-button" type="button" class="screen__button screen__button--secondary">Main Menu</button>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
