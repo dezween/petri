@@ -1,6 +1,6 @@
 import type { Vector2 } from "../domain/geometry";
 import { isOverlapping } from "../domain/geometry";
-import type { Player } from "../domain/cell.entity";
+import type { Cell, Player } from "../domain/cell.entity";
 import { massToRadius } from "../domain/cell.entity";
 import type { Bot } from "../domain/bot.entity";
 import type { Food } from "../domain/food.entity";
@@ -10,11 +10,19 @@ import {
   isAtVictoryCap,
   resolveEating,
 } from "../domain/rules";
+import type { PositionedMass } from "../domain/bot-ai/types";
+import { wandererMove } from "../domain/bot-ai/wanderer";
+import { hunterMove } from "../domain/bot-ai/hunter";
+import { fleerMove } from "../domain/bot-ai/fleer";
+import { BotPopulationService } from "./bot-population.service";
 
 export const DEFAULT_ARENA_WIDTH = 1000;
 
 /** Tunable: base player movement speed (units/sec) at mass=1. Tuned for real in task 027. */
 const BASE_SPEED = 120;
+
+/** Tunable: base bot movement speed (units/sec) at mass=1 — slightly slower than the player so an equal-mass chase is survivable. Tuned for real in task 027. */
+const BOT_BASE_SPEED = 100;
 
 export interface WorldSnapshot {
   player: Player;
@@ -44,6 +52,7 @@ export class WorldService {
     bots: Bot[] = [],
     food: Food[] = [],
     arenaWidth: number = DEFAULT_ARENA_WIDTH,
+    private readonly populationService?: BotPopulationService,
   ) {
     this.player = player;
     this.bots = bots;
@@ -66,6 +75,16 @@ export class WorldService {
     );
     const victoryReached = isAtVictoryCap(this.player.radius, this.arenaWidth);
 
+    if (this.populationService) {
+      const spawned = this.populationService.update(
+        this.bots,
+        this.player,
+        deltaTime,
+        this.arenaWidth,
+      );
+      if (spawned.length > 0) this.bots.push(...spawned);
+    }
+
     return { playerEaten, victoryReached };
   }
 
@@ -79,21 +98,47 @@ export class WorldService {
   }
 
   private movePlayer(deltaTime: number, direction: Vector2): void {
+    this.applyMovement(this.player, direction, deltaTime, BASE_SPEED);
+  }
+
+  private moveBots(deltaTime: number): void {
+    for (const bot of this.bots) {
+      const direction = this.computeBotDirection(bot, deltaTime);
+      this.applyMovement(bot, direction, deltaTime, BOT_BASE_SPEED);
+    }
+  }
+
+  private computeBotDirection(bot: Bot, deltaTime: number): Vector2 {
+    switch (bot.behavior) {
+      case "wanderer":
+        return wandererMove(bot, this.food, deltaTime);
+      case "hunter":
+        return hunterMove(bot, this.othersFor(bot), deltaTime);
+      case "fleer":
+        return fleerMove(bot, this.othersFor(bot), this.arenaWidth, deltaTime);
+    }
+  }
+
+  /** Player + every other bot + all food, as the generic PositionedMass shape bot AI steers against. */
+  private othersFor(bot: Bot): PositionedMass[] {
+    return [this.player, ...this.bots.filter((b) => b.id !== bot.id), ...this.food];
+  }
+
+  /** Speed decreases as mass grows — simple inverse-sqrt relationship, tuned for real in 027. Shared by player and bot movement so both scale the same way. */
+  private applyMovement(
+    entity: Cell,
+    direction: Vector2,
+    deltaTime: number,
+    baseSpeed: number,
+  ): void {
     const length = Math.hypot(direction.x, direction.z);
     if (length === 0) return;
 
     const normalized = { x: direction.x / length, z: direction.z / length };
-    // Speed decreases as mass grows — simple inverse-sqrt relationship, tuned for real in 027.
-    const speed = BASE_SPEED / Math.sqrt(Math.max(this.player.mass, 1));
+    const speed = baseSpeed / Math.sqrt(Math.max(entity.mass, 1));
 
-    this.player.position.x += normalized.x * speed * deltaTime;
-    this.player.position.z += normalized.z * speed * deltaTime;
-  }
-
-  private moveBots(_deltaTime: number): void {
-    // Placeholder: real wanderer/hunter/fleer behaviors land in tasks 006-008.
-    // Bots stay stationary for now — collision/eating logic below already works
-    // correctly against stationary bots, so this is safe to defer.
+    entity.position.x += normalized.x * speed * deltaTime;
+    entity.position.z += normalized.z * speed * deltaTime;
   }
 
   private clampToArena(entity: { position: Vector2; radius: number }): void {
