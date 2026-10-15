@@ -7,8 +7,13 @@ import type { Bot, BotBehavior } from "../domain/bot.entity";
 /** Starting mass for every freshly spawned bot. Tuned for real in task 027. */
 export const INITIAL_BOT_MASS = 5;
 
-/** Minimum distance a freshly (re)spawned bot must land from the player, so a respawn never ambushes someone standing still. */
-export const MIN_SPAWN_DISTANCE_FROM_PLAYER = 150;
+/**
+ * Minimum distance a freshly (re)spawned bot must land from the player, so a respawn never
+ * ambushes someone standing still. Balance pass (027): bumped from 150 — after retuning
+ * RADIUS_PER_MASS_SQRT (cell.entity.ts, 2 -> 24), starting player + bot radii alone sum to
+ * ~130 units, leaving almost no buffer at the old value.
+ */
+export const MIN_SPAWN_DISTANCE_FROM_PLAYER = 250;
 
 export interface PopulationThreshold {
   /** Player mass at/above which this tier applies. */

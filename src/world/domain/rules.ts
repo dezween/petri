@@ -18,7 +18,20 @@ export function resolveEating<T extends Massive>(a: T, b: T): EatResult<T> | nul
   return null;
 }
 
-/** MVP mass transfer: direct 1:1 addition, no decay or efficiency loss. */
+/**
+ * MVP mass transfer: direct 1:1 addition, no decay or efficiency loss. Balance pass (027)
+ * considered a flat multiplier here instead of retuning RADIUS_PER_MASS_SQRT (see
+ * cell.entity.ts) — rejected: with starting masses of 5 (bot) / 10 (player) / 1 (food), any
+ * multiplier large enough to make the victory cap reachable in a reasonable session (~35,156
+ * mass at the default arena width and a flat 1:1 transfer — an empirical 40s playtest
+ * measured ~0.05 mass/sec, i.e. ~195 hours to cap) also makes a single food pickup worth
+ * several times someone's entire starting mass, producing exactly the "instant off-screen
+ * snipe" deaths this task's acceptance criteria warns against (confirmed: at a 60x
+ * multiplier, a bot that ate just one food jumped from mass 5 to 65 and one-shot the player
+ * within 16 seconds). Retuning the mass-to-radius conversion instead keeps every entity's
+ * mass proportional to the others exactly as before, so a bite's value relative to your
+ * current size never changes — only how much total mass the victory radius requires does.
+ */
 export function growMass(eaterMass: number, eatenMass: number): number {
   return eaterMass + eatenMass;
 }

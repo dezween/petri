@@ -4,12 +4,17 @@ import type { Vector2 } from "@/world/domain/geometry";
 /** How high above the arena the camera sits. Only affects perspective-free ortho rendering, not zoom. */
 const CAMERA_HEIGHT = 500;
 
+/**
+ * Balance pass (027): scaled alongside cell.entity.ts's RADIUS_PER_MASS_SQRT (currently 8,
+ * i.e. 4x the original 2) so on-screen framing is unchanged — these three constants only
+ * make sense relative to that one, not as absolute values.
+ */
 /** Half-width of the view frustum when the player is at minimum size. */
-const BASE_VIEW_HALF_WIDTH = 150;
+const BASE_VIEW_HALF_WIDTH = 600;
 /** Extra view half-width gained per unit of player radius, so the camera pulls back as the player grows. */
-const ZOOM_OUT_PER_RADIUS = 2.2;
+const ZOOM_OUT_PER_RADIUS = 2.2 / 4;
 /** Never zoom in tighter than this, even for a freshly-spawned player. */
-const MIN_VIEW_HALF_WIDTH = 100;
+const MIN_VIEW_HALF_WIDTH = 400;
 
 /**
  * Orthographic top-down camera: no perspective distortion, which suits a flat arena viewed

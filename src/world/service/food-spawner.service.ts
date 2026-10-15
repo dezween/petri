@@ -12,8 +12,13 @@ export const TARGET_FOOD_COUNT = 150;
 /** Seconds between a food particle being eaten and its replacement appearing. Tuned for real in task 027. */
 export const FOOD_RESPAWN_DELAY_SECONDS = 2;
 
-/** Minimum distance a freshly spawned food particle must land from the player or any bot, so it never spawns already-overlapping something that would eat it instantly off-screen. */
-export const MIN_SPAWN_DISTANCE_FROM_ENTITY = 40;
+/**
+ * Minimum distance a freshly spawned food particle must land from the player or any bot, so
+ * it never spawns already-overlapping something that would eat it instantly off-screen.
+ * Balance pass (027): bumped from 40 — after retuning RADIUS_PER_MASS_SQRT (cell.entity.ts,
+ * 2 -> 24), a starting player's radius alone is ~76 units, well past the old buffer.
+ */
+export const MIN_SPAWN_DISTANCE_FROM_ENTITY = 150;
 
 export interface FoodSpawnerConfig {
   targetCount: number;

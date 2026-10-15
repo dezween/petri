@@ -173,14 +173,36 @@ export class WorldService {
     }
   }
 
-  /** Returns true if the player was eaten this tick (caller should trigger Game Over). */
+  /**
+   * Returns true if the player was eaten this tick (caller should trigger Game Over).
+   *
+   * Bug fix (027): every `isOverlapping` check below uses a `radius` captured at the *start*
+   * of this call (`startRadius`/frozen `Circle`s), never an entity's live, already-updated
+   * radius. Originally each sub-loop grew `entity.radius` immediately after an eat and kept
+   * scanning the same list with that larger radius — letting one bot's growing reach cascade
+   * through a whole cluster of food in a single tick. That was mostly invisible at the old
+   * RADIUS_PER_MASS_SQRT=2 (a radius gain of ~0.4 units per food), but after retuning it to
+   * 24 for the 027 balance pass (a ~5 unit gain per food) it became a severe correctness bug:
+   * a Playwright playtest showed a fresh bot reaching mass 30+ within about a second of
+   * session start, purely from chain-eating a food cluster, nowhere near real movement time.
+   * Mass still accumulates correctly across multiple eats in one tick (that part was never
+   * wrong) — only the radius used for *this tick's* overlap checks is now stable throughout.
+   */
   private resolveCollisions(): boolean {
     let playerEaten = false;
+    const startRadius = new Map<string, number>();
+    startRadius.set(this.player.id, this.player.radius);
+    for (const bot of this.bots) startRadius.set(bot.id, bot.radius);
+    const frozen = (entity: Cell): Cell => {
+      const radius = startRadius.get(entity.id);
+      return radius === undefined ? entity : { ...entity, radius };
+    };
 
     // Player vs bots.
     const eatenBotIds = new Set<string>();
+    const frozenPlayer = frozen(this.player);
     for (const bot of this.bots) {
-      if (!isOverlapping(this.player, bot)) continue;
+      if (!isOverlapping(frozenPlayer, frozen(bot))) continue;
       const result = resolveEating(this.player, bot);
       if (!result) continue;
       if (result.eaten.id === this.player.id) {
@@ -195,10 +217,11 @@ export class WorldService {
 
     if (playerEaten) return true;
 
-    // Player vs food.
+    // Player vs food (food has no entry in startRadius, so frozen() passes it through as-is
+    // — food's radius never changes mid-resolution, only the eater's does).
     const eatenFoodIds = new Set<string>();
     for (const food of this.food) {
-      if (!isOverlapping(this.player, food)) continue;
+      if (!isOverlapping(frozenPlayer, food)) continue;
       this.player.mass = growMass(this.player.mass, food.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenFoodIds.add(food.id);
@@ -212,7 +235,7 @@ export class WorldService {
         const a = this.bots[i];
         const b = this.bots[j];
         if (eatenBotIds2.has(a.id) || eatenBotIds2.has(b.id)) continue;
-        if (!isOverlapping(a, b)) continue;
+        if (!isOverlapping(frozen(a), frozen(b))) continue;
         const result = resolveEating(a, b);
         if (!result) continue;
         result.eater.mass = growMass(result.eater.mass, result.eaten.mass);
@@ -224,9 +247,10 @@ export class WorldService {
     // Bot vs food.
     for (const bot of this.bots) {
       if (eatenBotIds2.has(bot.id)) continue;
+      const frozenBot = frozen(bot);
       for (const food of this.food) {
         if (eatenFoodIds.has(food.id)) continue;
-        if (!isOverlapping(bot, food)) continue;
+        if (!isOverlapping(frozenBot, food)) continue;
         bot.mass = growMass(bot.mass, food.mass);
         bot.radius = massToRadius(bot.mass);
         eatenFoodIds.add(food.id);
