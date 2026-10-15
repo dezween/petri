@@ -2,6 +2,15 @@
 // mounts the 3D canvas behind these, full-viewport, so everything here is `position:
 // fixed` chrome layered on top of it.
 
+// The 3D canvas's mount point. z-index 0 (the default) keeps it below every `.screen`/`.hud`
+// z-index without needing a variable of its own.
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .screen {
   position: fixed;
   inset: 0;
