@@ -1,0 +1,23 @@
+// Generic text styles shared across screens — component partials only layer on
+// screen-specific color accents, not duplicate these base sizes/weights.
+h1,
+p {
+  margin: 0;
+}
+
+.screen__title {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.screen__instructions {
+  font-size: 1rem;
+  line-height: 1.5;
+  max-width: 32ch;
+}
+
+.screen__score {
+  font-size: 1.15rem;
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,53 @@
+// Overlay positioning shared by every screen/HUD — the composition root (task 025/026)
+// mounts the 3D canvas behind these, full-viewport, so everything here is `position:
+// fixed` chrome layered on top of it.
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-screen);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-5);
+
+  // Glassy dimming over the 3D scene — the whole viewport reads as the modal rather than
+  // a floating card, which keeps this correct without needing extra wrapper markup.
+  background: var(--color-bg);
+  backdrop-filter: blur(var(--blur));
+}
+
+// HUD sits in a corner and must never capture pointer input — the mouse-direction input
+// adapter (task 016) tracks the cursor relative to the whole viewport, so an overlapping
+// hit-testable element here would silently eat movement input during Playing.
+.hud {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: var(--z-hud);
+  pointer-events: none;
+
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 480px) {
+  .screen {
+    padding: var(--space-3);
+  }
+
+  .hud {
+    top: var(--space-2);
+    left: var(--space-2);
+  }
+}

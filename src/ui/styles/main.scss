@@ -1,0 +1,12 @@
+// Import order matters: tokens define the custom properties everything else reads,
+// base lays down generic element/interactive styling, layout positions the overlays,
+// and components layer on screen-specific accents last so they can override freely.
+@use "tokens" as *;
+@use "base/reset" as *;
+@use "base/typography" as *;
+@use "base/buttons" as *;
+@use "layout/overlay" as *;
+@use "components/menu" as *;
+@use "components/hud" as *;
+@use "components/game-over" as *;
+@use "components/victory" as *;

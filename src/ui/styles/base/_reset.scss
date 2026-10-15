@@ -1,0 +1,25 @@
+// Minimal reset — just enough that the overlay/component partials aren't fighting
+// browser defaults (UA margins, button chrome, box-sizing surprises).
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background: var(--color-bg);
+  overflow: hidden; // the 3D canvas (added by task 025/026) fills the viewport; no page scroll
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}

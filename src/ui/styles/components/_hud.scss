@@ -1,0 +1,16 @@
+.hud {
+  font-variant-numeric: tabular-nums; // mass digits shouldn't jiggle the layout width as they change
+}
+
+.hud__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.hud__value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}

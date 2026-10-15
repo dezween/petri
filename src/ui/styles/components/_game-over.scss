@@ -1,0 +1,11 @@
+#game-over-screen {
+  background: radial-gradient(
+    circle at 50% 40%,
+    rgba(198, 91, 60, 0.25),
+    var(--color-bg) 70%
+  );
+}
+
+#game-over-screen .screen__title {
+  color: var(--color-danger);
+}

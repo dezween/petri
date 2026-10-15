@@ -7,4 +7,13 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  css: {
+    preprocessorOptions: {
+      // Opts into Dart Sass's modern compiler API — the legacy one Vite defaults to is
+      // deprecated and prints a build-time warning on every SCSS compile.
+      scss: {
+        api: "modern-compiler",
+      },
+    },
+  },
 });
