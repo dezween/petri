@@ -24,6 +24,19 @@ def main():
     nucleus_mat = make_material("NucleusMat", (0.85, 0.95, 1.0), alpha=1.0, roughness=0.3)
     nucleus.data.materials.append(nucleus_mat)
 
+    # Join into a single mesh (mirroring generate_bot_hunter.py/generate_bot_fleer.py) — each
+    # source object keeps its own material slot across the join, so the translucent-membrane +
+    # solid-nucleus two-tone look survives in the exported glTF as one mesh with two material
+    # slots. Without this, the exported model has two sibling mesh nodes and
+    # cell-mesh-factory.ts's extractMesh() (which only keeps the first Mesh found) would
+    # silently drop one of them.
+    bpy.ops.object.select_all(action='DESELECT')
+    membrane.select_set(True)
+    nucleus.select_set(True)
+    bpy.context.view_layer.objects.active = membrane
+    bpy.ops.object.join()
+    membrane.name = "PlayerCell_Full"
+
     out_path = str(models_output_dir() / "player_cell.glb")
 
     bpy.ops.object.select_all(action='SELECT')

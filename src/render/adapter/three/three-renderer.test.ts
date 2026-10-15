@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as THREE from "three";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import { ThreeRenderer } from "./three-renderer";
 
@@ -36,5 +37,26 @@ describe("ThreeRenderer", () => {
   it("dispose() before init() is a safe no-op", () => {
     const renderer = new ThreeRenderer();
     expect(() => renderer.dispose()).not.toThrow();
+  });
+
+  it("dispose() releases the static floor/rim geometry and materials, not just the renderer", () => {
+    // The floor/rim are built in the constructor (createScene), independent of init(), so
+    // this can be verified without a real WebGL context — only THREE.WebGLRenderer.dispose()
+    // (called when `this.renderer` exists) needs one, and that's not under test here.
+    const renderer = new ThreeRenderer();
+    const scene = (renderer as unknown as { scene: THREE.Scene }).scene;
+    const floor = scene.getObjectByName("arena-floor") as THREE.Mesh;
+    const rim = scene.getObjectByName("arena-rim") as THREE.Mesh;
+    const floorGeometryDispose = vi.spyOn(floor.geometry, "dispose");
+    const floorMaterialDispose = vi.spyOn(floor.material as THREE.Material, "dispose");
+    const rimGeometryDispose = vi.spyOn(rim.geometry, "dispose");
+    const rimMaterialDispose = vi.spyOn(rim.material as THREE.Material, "dispose");
+
+    renderer.dispose();
+
+    expect(floorGeometryDispose).toHaveBeenCalledOnce();
+    expect(floorMaterialDispose).toHaveBeenCalledOnce();
+    expect(rimGeometryDispose).toHaveBeenCalledOnce();
+    expect(rimMaterialDispose).toHaveBeenCalledOnce();
   });
 });
