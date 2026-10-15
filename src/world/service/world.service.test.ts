@@ -62,6 +62,20 @@ describe("WorldService.tick — movement", () => {
     expect(snapshot.position.x).toBeLessThanOrEqual(half - snapshot.radius + 1e-9);
   });
 
+  it("keeps the player within the arena's circular boundary (not its bounding square) when driven diagonally for a long time", () => {
+    const player = makePlayer({ position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [], []);
+
+    for (let i = 0; i < 1000; i++) world.tick(1 / 60, { x: 1, z: 1 });
+
+    const { player: snapshot, arenaWidth } = world.getSnapshot();
+    const arenaRadius = arenaWidth / 2;
+    const distanceFromCenter = Math.hypot(snapshot.position.x, snapshot.position.z);
+    // A square clamp would let this reach ~sqrt(2) * (half - radius), i.e. past the
+    // circular rim — must stay within the circle instead.
+    expect(distanceFromCenter).toBeLessThanOrEqual(arenaRadius - snapshot.radius + 1e-9);
+  });
+
   it("does nothing when the input direction has zero length", () => {
     const player = makePlayer({ position: { x: 5, z: -5 } });
     const world = new WorldService(player, [], []);

@@ -1,4 +1,5 @@
 import type { Vector2 } from "../domain/geometry";
+import { randomPointInDisk } from "../domain/geometry";
 import { massToRadius } from "../domain/cell.entity";
 import type { Player } from "../domain/cell.entity";
 import type { Bot, BotBehavior } from "../domain/bot.entity";
@@ -109,14 +110,16 @@ export class BotPopulationService {
     };
   }
 
+  /**
+   * Samples within the arena's circular floor (not its bounding square) — see
+   * `randomPointInDisk`'s doc comment for why a bot spawned in a square "corner" would
+   * visually float outside the rendered dish.
+   */
   private randomSpawnPosition(arenaWidth: number, player: Player): Vector2 {
-    const half = arenaWidth / 2;
+    const maxRadius = Math.max(arenaWidth / 2 - massToRadius(INITIAL_BOT_MASS), 0);
     let candidate: Vector2 = { x: 0, z: 0 };
     for (let attempt = 0; attempt < 10; attempt++) {
-      candidate = {
-        x: (this.rng() * 2 - 1) * half,
-        z: (this.rng() * 2 - 1) * half,
-      };
+      candidate = randomPointInDisk(this.rng, maxRadius);
       const dx = candidate.x - player.position.x;
       const dz = candidate.z - player.position.z;
       if (Math.hypot(dx, dz) >= MIN_SPAWN_DISTANCE_FROM_PLAYER) return candidate;

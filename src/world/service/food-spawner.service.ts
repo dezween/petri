@@ -1,8 +1,10 @@
 import type { Vector2 } from "../domain/geometry";
+import { randomPointInDisk } from "../domain/geometry";
 import type { Player } from "../domain/cell.entity";
+import { massToRadius } from "../domain/cell.entity";
 import type { Bot } from "../domain/bot.entity";
 import type { Food } from "../domain/food.entity";
-import { createFood } from "../domain/food.entity";
+import { createFood, FOOD_MASS } from "../domain/food.entity";
 
 /** Target food count across the arena — the steady-density knob. Tuned for real in task 027. */
 export const TARGET_FOOD_COUNT = 150;
@@ -74,14 +76,17 @@ export class FoodSpawnerService {
     return createFood(`food-${this.nextId++}`, this.randomSpawnPosition(arenaWidth, player, bots));
   }
 
+  /**
+   * Samples within the arena's circular floor (not its bounding square) — see
+   * `randomPointInDisk`'s doc comment for why food spawned in a square "corner" would
+   * visually float outside the rendered dish, and — since food never moves once placed —
+   * stay stuck there permanently instead of drifting back in like a moving entity would.
+   */
   private randomSpawnPosition(arenaWidth: number, player: Player, bots: Bot[]): Vector2 {
-    const half = arenaWidth / 2;
+    const maxRadius = Math.max(arenaWidth / 2 - massToRadius(FOOD_MASS), 0);
     let candidate: Vector2 = { x: 0, z: 0 };
     for (let attempt = 0; attempt < 10; attempt++) {
-      candidate = {
-        x: (this.rng() * 2 - 1) * half,
-        z: (this.rng() * 2 - 1) * half,
-      };
+      candidate = randomPointInDisk(this.rng, maxRadius);
       if (this.isClearOfBlockers(candidate, player, bots)) return candidate;
     }
     // Exhausted retries (tiny arena or a very crowded one) — accept the last attempt

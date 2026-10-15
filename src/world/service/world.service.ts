@@ -128,7 +128,7 @@ export class WorldService {
       case "hunter":
         return hunterMove(bot, this.othersFor(bot), deltaTime);
       case "fleer":
-        return fleerMove(bot, this.othersFor(bot), this.arenaWidth, deltaTime);
+        return fleerMove(bot, this.othersFor(bot), deltaTime);
     }
   }
 
@@ -154,12 +154,23 @@ export class WorldService {
     entity.position.z += normalized.z * speed * deltaTime;
   }
 
+  /**
+   * The arena is a circular dish (see render/adapter/three/scene.ts's floor/rim), not a
+   * square, so the boundary must be enforced radially from the center — clamping x and z
+   * independently would let an entity sit in a square "corner" that's outside the visible
+   * circular floor, with its mesh floating past the rendered rim. Clamps the entity's
+   * *edge* (center distance + radius), not just its center point, so large cells don't
+   * visually clip through the rim either.
+   */
   private clampToArena(entity: { position: Vector2; radius: number }): void {
-    const half = this.arenaWidth / 2;
-    const min = -half + entity.radius;
-    const max = half - entity.radius;
-    entity.position.x = Math.min(Math.max(entity.position.x, min), max);
-    entity.position.z = Math.min(Math.max(entity.position.z, min), max);
+    const arenaRadius = this.arenaWidth / 2;
+    const maxDistanceFromCenter = Math.max(arenaRadius - entity.radius, 0);
+    const distanceFromCenter = Math.hypot(entity.position.x, entity.position.z);
+    if (distanceFromCenter > maxDistanceFromCenter && distanceFromCenter > 0) {
+      const scale = maxDistanceFromCenter / distanceFromCenter;
+      entity.position.x *= scale;
+      entity.position.z *= scale;
+    }
   }
 
   /** Returns true if the player was eaten this tick (caller should trigger Game Over). */

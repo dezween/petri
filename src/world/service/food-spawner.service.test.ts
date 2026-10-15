@@ -41,6 +41,24 @@ describe("FoodSpawnerService.spawnInitialFood", () => {
   });
 });
 
+describe("FoodSpawnerService.spawnInitialFood — circular arena bound", () => {
+  it("never spawns outside the arena's circular floor, even near the square bounding box's corners", () => {
+    // Player/bots far from the arena center so the min-distance-from-blockers retry
+    // logic doesn't itself bias food away from the corners — isolates the disk-sampling check.
+    const service = new FoodSpawnerService({ targetCount: 150, respawnDelaySeconds: 3 });
+    const arenaWidth = 1000;
+    const player = makePlayer({ x: -10000, z: -10000 });
+
+    const food = service.spawnInitialFood(arenaWidth, player, []);
+
+    const arenaRadius = arenaWidth / 2;
+    for (const f of food) {
+      const distanceFromCenter = Math.hypot(f.position.x, f.position.z);
+      expect(distanceFromCenter).toBeLessThanOrEqual(arenaRadius - f.radius + 1e-9);
+    }
+  });
+});
+
 describe("FoodSpawnerService.update — respawn", () => {
   it("schedules a respawn on deficit and spawns it once the delay elapses", () => {
     const service = new FoodSpawnerService({ targetCount: 1, respawnDelaySeconds: 3 });

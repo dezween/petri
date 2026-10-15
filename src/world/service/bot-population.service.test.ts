@@ -47,6 +47,25 @@ describe("BotPopulationService.spawnInitialBots", () => {
       expect(d).toBeGreaterThanOrEqual(150 - 1e-9);
     }
   });
+
+  it("never spawns outside the arena's circular floor, even near the square bounding box's corners", () => {
+    // Player far from the arena center so the min-distance-from-player retry logic
+    // doesn't itself bias bots away from the corners — isolates the disk-sampling check.
+    const service = new BotPopulationService(
+      { respawnDelaySeconds: 3, thresholds: [{ mass: 0, totalCount: 100, hunterRatio: 1 / 3 }] },
+    );
+    const arenaWidth = 1000;
+    const player = makePlayer();
+    player.position = { x: -10000, z: -10000 };
+
+    const bots = service.spawnInitialBots(arenaWidth, player);
+
+    const arenaRadius = arenaWidth / 2;
+    for (const bot of bots) {
+      const distanceFromCenter = Math.hypot(bot.position.x, bot.position.z);
+      expect(distanceFromCenter).toBeLessThanOrEqual(arenaRadius - bot.radius + 1e-9);
+    }
+  });
 });
 
 describe("BotPopulationService.update — respawn", () => {

@@ -17,18 +17,18 @@ export const FLEER_DETECTION_RADIUS = 180;
 const EDGE_BIAS = 0.35;
 
 /**
- * Deviation from the task doc's literal 3-arg signature: arena bounds are required to
- * compute "nearest edge," so `arenaWidth` is threaded through as an extra parameter
- * rather than smuggled some other way.
- *
  * Skittish movement: flees the nearest bigger entity within range, biased toward the
- * nearest arena wall. Falls back to wanderer-style ambling (reusing `wandererMove`) when
+ * nearest arena edge. Falls back to wanderer-style ambling (reusing `wandererMove`) when
  * nothing threatening is in range, so a fleer with no threat nearby is never frozen.
+ *
+ * No arena-size parameter needed: the arena is a circle centered at the origin (see
+ * `world.service.ts`'s radial clamp and `render/adapter/three/scene.ts`'s floor/rim), so
+ * "nearest edge" is just the radially-outward direction from (0, 0) — independent of the
+ * arena's actual radius.
  */
 export function fleerMove(
   bot: Bot,
   nearbyEntities: PositionedMass[],
-  arenaWidth: number,
   deltaTime: number,
 ): Vector2 {
   const threats = nearbyEntities.filter(
@@ -38,20 +38,13 @@ export function fleerMove(
   if (!threat) return wandererMove(bot, nearbyEntities, deltaTime);
 
   const away = normalize(directionTo(threat.position, bot.position));
-  const towardEdge = directionToNearestEdge(bot.position, arenaWidth);
+  const towardEdge = directionToNearestEdge(bot.position);
   return blend(away, towardEdge, EDGE_BIAS);
 }
 
-function directionToNearestEdge(position: Vector2, arenaWidth: number): Vector2 {
-  const half = arenaWidth / 2;
-  const edges: Array<[Vector2, number]> = [
-    [{ x: 1, z: 0 }, half - position.x],
-    [{ x: -1, z: 0 }, position.x + half],
-    [{ x: 0, z: 1 }, half - position.z],
-    [{ x: 0, z: -1 }, position.z + half],
-  ];
-  edges.sort((a, b) => a[1] - b[1]);
-  return edges[0]![0];
+/** Radially outward from the arena center. Returns the zero vector at the exact center, where no edge is nearer than any other — `blend` handles that gracefully since it just scales `away`'s contribution down, not to zero. */
+function directionToNearestEdge(position: Vector2): Vector2 {
+  return normalize(position);
 }
 
 function normalize(v: Vector2): Vector2 {
