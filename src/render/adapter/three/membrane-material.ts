@@ -25,6 +25,10 @@ const FRESNEL_COLOR = new THREE.Color(0.75, 0.92, 1.0);
 const FRESNEL_POWER = 2.5;
 const FRESNEL_INTENSITY = 0.6;
 
+// Confirmed (not retuned) in task 006's playtest: a real close-up screenshot of a fresh player
+// cell shows a clear bright rim at grazing angles with the nucleus still visible through the
+// membrane — reads as glass/liquid rather than a flat disc or an obvious shader artifact.
+
 /**
  * Finds the player cell's translucent membrane mesh inside its (possibly multi-primitive, see
  * `cell-mesh-factory.ts`'s `buildStaticObject`) loaded model and injects a fresnel rim-light

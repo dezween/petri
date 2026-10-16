@@ -9,8 +9,10 @@ const CAMERA_HEIGHT = 500;
  * old perfectly-top-down view; this tilts it so the scene reads as 3D (parallax, visible object
  * sides, angled shadows) without switching to a `PerspectiveCamera` — see
  * docs/epic-3/SPEC.md's Design Decision 1 for why tilting the existing `OrthographicCamera` was
- * chosen over a perspective switch. Starting value, not final — task 006's balance pass tunes it
- * by eye.
+ * chosen over a perspective switch. Confirmed (not retuned) in task 006's playtest: real
+ * screenshots at all three arena sizes show visible shadow/parallax depth while entity-size
+ * legibility stays intact (circles only compress to a measured ~8% ellipse at this angle —
+ * `sin(67°) ≈ 0.92` — small enough that relative sizes are still easy to judge at a glance).
  */
 const CAMERA_ELEVATION_DEGREES = 67;
 

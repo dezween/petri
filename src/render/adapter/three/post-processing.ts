@@ -33,6 +33,14 @@ export const RadialBlurShader = {
     // begins ramping in / reaches its maximum. Tuned so the dish (which fills roughly the
     // central half of the view at typical zoom) stays sharp, and the bench/props beyond it
     // soften — exact values are a judgment call, re-tuned for real in task 016's playtest.
+    // Epic 3, task 006: re-verified under the task 001 camera tilt (67° elevation), which was
+    // flagged as a risk since this falloff is a screen-space circle while the tilted dish
+    // actually projects as a slight ellipse (~8% vertical compression, sin(67°) ≈ 0.92).
+    // Confirmed via a real Large-arena screenshot (where the dish fills enough of the frame to
+    // see the falloff clearly): the blur still ramps symmetrically from a sharp center to a
+    // blurred periphery with no visible misalignment against the dish edge — the ~8% eccentricity
+    // is small relative to this falloff's wide transition band (0.42 to 0.9), so no retuning or
+    // elliptical-falloff logic change was needed.
     innerRadius: { value: 0.42 },
     outerRadius: { value: 0.9 },
     // Max blur kernel radius in screen pixels at/beyond outerRadius.

@@ -167,18 +167,21 @@ const IDENTITY_QUATERNION = new THREE.Quaternion();
  * `bot_wanderer` (both near-spherical) cast none at any zoom/mass tested. Raising entities by a
  * fraction of their own world-space radius surfaces enough of each sphere above the floor for
  * its shadow to actually be visible, while staying modest enough to still read as "sitting in
- * the dish" rather than floating above it — tuned for real in task 006's balance pass, like
- * every other new-in-Epic-3 visual constant. Task 004's bobbing animation adds a small
- * *oscillating* offset on top of this fixed base elevation, not a replacement for it.
+ * the dish" rather than floating above it — confirmed (not retuned) in task 006's playtest, with
+ * clean shadows under every entity type across all three arena sizes. Task 004's bobbing
+ * animation adds a small *oscillating* offset on top of this fixed base elevation, not a
+ * replacement for it.
  */
 const GROUND_ELEVATION_FRACTION = 0.4;
 
 /**
  * Epic 3, task 004: small continuous Y-oscillation on top of `GROUND_ELEVATION_FRACTION`'s fixed
  * base height, so entities read as floating/buoyant rather than rigidly fixed to one plane.
- * Amplitude/frequency are SPEC.md's Design Decision 4 starting values (2-4 world units,
- * 0.5-1 Hz) — tuned for real in task 006's balance pass, like every other new-in-Epic-3 visual
- * constant, hence the generous comment rather than a bare magic number.
+ * Amplitude/frequency per SPEC.md's Design Decision 4 (2-4 world units, 0.5-1 Hz) — confirmed
+ * (not retuned) in task 006's playtest: at mid-range values (3 units, 0.75Hz) the motion reads
+ * as a gentle float rather than jitter, intentionally subtle relative to a ~40-unit starting
+ * player radius (SPEC.md's own stated goal, not an oversight — a bob large enough to be obvious
+ * in a single static screenshot would read as seasick in motion).
  */
 const BOB_AMPLITUDE = 3;
 const BOB_FREQUENCY_HZ = 0.75;
