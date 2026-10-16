@@ -15,6 +15,16 @@ export interface MenuScreen {
   show(): void;
   hide(): void;
   onPlay(handler: (arenaWidth: number) => void): void;
+  /** The Settings button (Epic 2, task 007) lives on the Main Menu screen itself. */
+  onOpenSettings(handler: () => void): void;
+}
+
+/** Port for the Settings screen (Epic 2, task 006/007) — a DOM-only modal overlay on top of
+ * MainMenu, not a `SessionStateName` of its own (see this file's class doc comment). */
+export interface SettingsScreen {
+  show(): void;
+  hide(): void;
+  onBack(handler: () => void): void;
 }
 
 /** Port for the live HUD overlay (task 020) — adds show/hide to the IHud data contract. */
@@ -36,6 +46,7 @@ export interface SessionStateScreens {
   hud: HudScreen;
   gameOver: ResultScreen;
   victory: ResultScreen;
+  settings: SettingsScreen;
 }
 
 export interface SessionStateDeps {
@@ -51,9 +62,16 @@ export interface SessionStateDeps {
  * transition logic in this codebase — screens are dumb (DOM + registration hooks), this
  * class is the one place that decides what happens next and drives the game loop.
  *
- * Exactly the 7 transitions SPEC.md lists are reachable: Play, death, victory-cap, and the
- * two Restart/MainMenu pairs out of GameOver/Victory. There's no path from MainMenu straight
- * to GameOver/Victory — those only fire from inside an active game loop's callbacks.
+ * Exactly the 7 transitions SPEC.md lists remain the only `SessionStateName` transitions:
+ * Play, death, victory-cap, and the two Restart/MainMenu pairs out of GameOver/Victory. There's
+ * no path from MainMenu straight to GameOver/Victory — those only fire from inside an active
+ * game loop's callbacks.
+ *
+ * Settings (Epic 2, task 007) is deliberately NOT an 8th state. It's a DOM-only modal overlay
+ * toggled on top of MainMenu while `current` stays `"MainMenu"` throughout — so it adds zero
+ * new `SessionStateName` members and zero new entries to the 7-transition count above; only
+ * MainMenu's *internal* screen visibility changes (menu hidden/settings shown, and back),
+ * which `current` was never tracking in the first place.
  */
 export class SessionState {
   private current: SessionStateName = "MainMenu";
@@ -67,8 +85,10 @@ export class SessionState {
   constructor(private readonly deps: SessionStateDeps) {
     this.selectedArenaWidth = deps.arenaWidth ?? DEFAULT_ARENA_WIDTH;
 
-    const { menu, gameOver, victory } = deps.screens;
+    const { menu, gameOver, victory, settings } = deps.screens;
     menu.onPlay((arenaWidth) => this.play(arenaWidth));
+    menu.onOpenSettings(() => this.openSettings());
+    settings.onBack(() => this.closeSettings());
     gameOver.onRestart(() => this.play());
     gameOver.onMainMenu(() => this.returnToMainMenu());
     victory.onRestart(() => this.play());
@@ -103,6 +123,20 @@ export class SessionState {
     // comment), so Restart calling play() again is already stop-then-restart with no risk of
     // two loops layering — no explicit stopMusic() needed here first.
     this.deps.audioPlayer.playMusic("ambient-music");
+  }
+
+  /** Only reachable from MainMenu (the Settings button only exists on that screen) — guarded
+   * anyway since `current` never changes here and a stray call while Playing/GameOver/Victory
+   * must not swap the menu/settings screens' visibility underneath whatever's actually shown. */
+  private openSettings(): void {
+    if (this.current !== "MainMenu") return;
+    this.deps.screens.menu.hide();
+    this.deps.screens.settings.show();
+  }
+
+  private closeSettings(): void {
+    this.deps.screens.settings.hide();
+    this.deps.screens.menu.show();
   }
 
   private returnToMainMenu(): void {
