@@ -7,7 +7,7 @@ import { buildArenaFloorAndRim, createScene } from "./scene";
 import { addLighting } from "./lighting";
 import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
-import { CellMeshFactory } from "./cell-mesh-factory";
+import { CellMeshFactory, disposeObject3D } from "./cell-mesh-factory";
 import { ParticleSystem } from "./particles";
 import { buildStaticProps } from "./static-props";
 import { PostProcessingPipeline } from "./post-processing";
@@ -142,13 +142,10 @@ export class ThreeRenderer implements IRenderer {
     }
     if (this.staticProps) {
       this.scene.remove(this.staticProps);
-      for (const child of this.staticProps.children) {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          for (const m of mats) m.dispose();
-        }
-      }
+      // disposeObject3D recurses through every child, including a multi-primitive prop's
+      // nested Group (see static-props.ts/cell-mesh-factory.ts's buildStaticObject) — a plain
+      // `instanceof THREE.Mesh` check one level deep would silently skip those and leak them.
+      disposeObject3D(this.staticProps);
       this.staticProps = undefined;
     }
     // createScene() (constructor) allocates the static floor/rim geometry+materials, which

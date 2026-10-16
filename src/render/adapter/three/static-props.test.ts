@@ -11,6 +11,16 @@ function fakeModel(): THREE.Object3D {
   return group;
 }
 
+/** Mirrors the real prop_empty_dish.glb/prop_pipette.glb shape: 2 primitives (different
+ * materials), which GLTFLoader imports as 2 sibling Meshes, not 1 Mesh with a material array —
+ * see cell-mesh-factory.ts's buildStaticObject doc comment. */
+function fakeMultiMeshModel(): THREE.Object3D {
+  const group = new THREE.Group();
+  group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial()));
+  group.add(new THREE.Mesh(new THREE.TorusGeometry(1, 0.1), new THREE.MeshStandardMaterial()));
+  return group;
+}
+
 describe("buildStaticProps", () => {
   it("places one static Mesh per prop placement when every prop model loaded", () => {
     const models: ModelCache = {
@@ -62,6 +72,27 @@ describe("buildStaticProps", () => {
     expect(mesh.scale.x).toBeCloseTo(90);
     expect(mesh.scale.y).toBeCloseTo(90);
     expect(mesh.scale.z).toBeCloseTo(90);
+  });
+
+  it("builds a Group (not a crash) for a prop whose model has more than one primitive, matching the real prop_empty_dish.glb/prop_pipette.glb shape", () => {
+    // Regression test for the real bug task 016's Playwright playtest caught: prop_empty_dish
+    // and prop_pipette each genuinely have 2 primitives (base+rim, shaft+bulb — different
+    // materials), which used to make the whole CellMeshFactory constructor throw on startup
+    // (since it called the strict single-mesh extractMesh for the player too) — aborting ALL
+    // entity+prop rendering. buildStaticProps must place these as a Group of their meshes,
+    // transformed together as one rigid unit, same as a single-mesh prop.
+    const models: ModelCache = { prop_empty_dish: fakeMultiMeshModel() };
+
+    const group = buildStaticProps(models);
+    const placed = group.children[0];
+
+    expect(placed).toBeInstanceOf(THREE.Group);
+    expect((placed as THREE.Group).children).toHaveLength(2);
+    for (const child of (placed as THREE.Group).children) expect(child).toBeInstanceOf(THREE.Mesh);
+    // Position/scale still apply to the whole placed object, same as the single-mesh case.
+    expect(placed.position.x).toBeCloseTo(996);
+    expect(placed.position.z).toBeCloseTo(836);
+    expect(placed.scale.x).toBeCloseTo(90);
   });
 
   it("never mutates the input ModelCache or its model objects", () => {

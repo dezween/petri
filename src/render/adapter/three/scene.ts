@@ -53,8 +53,16 @@ function buildLabBench(): THREE.Mesh {
   const geometry = new THREE.CircleGeometry(BENCH_RADIUS, 48);
   const material = new THREE.MeshStandardMaterial({
     color: BENCH_COLOR,
-    roughness: 0.85,
-    metalness: 0.05,
+    // Fully matte (roughness=1, metalness=0): task 016's Playwright playtest found that the
+    // original roughness=0.85/metalness=0.05 values put a visible specular highlight on this
+    // huge flat disc under the scene's DirectionalLight — a classic "specular ring" artifact on
+    // large flat ground planes, made worse by this geometry's coarse 48-segment triangulation
+    // (faceting the ring into a visible polygon) and further amplified by task 014's bloom pass
+    // (specular highlights are bright, easily crossing BLOOM_THRESHOLD). A true matte lab-bench
+    // surface shouldn't show a specular highlight at all, so eliminating it at the material
+    // level is the correct fix, not just a band-aid for this one light's angle.
+    roughness: 1,
+    metalness: 0,
   });
   const bench = new THREE.Mesh(geometry, material);
   bench.rotation.x = -Math.PI / 2;
