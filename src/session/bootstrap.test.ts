@@ -86,7 +86,11 @@ function fakeButton(): HTMLButtonElement {
 function buildElements(): BootstrapElements {
   return {
     canvasContainer: fakeElement(),
-    menu: { root: fakeElement(), playButton: fakeButton() },
+    menu: {
+      root: fakeElement(),
+      playButton: fakeButton(),
+      sizeButtons: { small: fakeButton(), medium: fakeButton(), large: fakeButton() },
+    },
     hud: { root: fakeElement(), massValue: fakeElement() },
     gameOver: {
       root: fakeElement(),
@@ -139,12 +143,16 @@ describe("bootstrap", () => {
     expect(mouseInputCalls[0]!.args).toEqual([elements.canvasContainer]);
   });
 
-  it("constructs MenuAdapter with the menu's own root and play button, not another screen's elements", () => {
+  it("constructs MenuAdapter with the menu's own root, play button, and size buttons, not another screen's elements", () => {
     const elements = buildElements();
 
     bootstrap(elements);
 
-    expect(menuAdapterCalls[0]!.args).toEqual([elements.menu.root, elements.menu.playButton]);
+    expect(menuAdapterCalls[0]!.args).toEqual([
+      elements.menu.root,
+      elements.menu.playButton,
+      elements.menu.sizeButtons,
+    ]);
   });
 
   it("constructs HudAdapter with the hud's own root and mass-value elements", () => {

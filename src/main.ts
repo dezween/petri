@@ -15,6 +15,11 @@ const { renderer } = bootstrap({
   menu: {
     root: required("menu-screen"),
     playButton: required("menu-play-button"),
+    sizeButtons: {
+      small: required("menu-size-small"),
+      medium: required("menu-size-medium"),
+      large: required("menu-size-large"),
+    },
   },
   hud: {
     root: required("hud-overlay"),
