@@ -98,9 +98,14 @@ actually looking at the result, not just trusting this math.
 - The existing `DirectionalLight` (`lighting.ts`) becomes the shadow-casting light:
   `light.castShadow = true`, with its `shadow.camera` (an orthographic shadow frustum, since
   it's a directional light) sized to cover the arena at its largest configured width (2000, per
-  Epic 2's Large size) rather than a fixed guess — reuse the same kind of worst-case sizing
-  reasoning `scene.ts`'s `BENCH_RADIUS` comment already documents for a similar problem, don't
-  recompute it from scratch with different assumptions.
+  Epic 2's Large size) rather than a fixed guess. This sizing is based directly on the arena's
+  own fixed world-space footprint (radius 1000, plus margin) — not `scene.ts`'s `BENCH_RADIUS`
+  (6000), which is a camera-viewport worst-case unrelated to what a shadow frustum needs to
+  cover; reusing it would make shadows needlessly blockier. The shadow camera's `near`/`far`
+  clipping planes also need explicit attention, not just the frustum's width/height: the light's
+  current position (`100, 300, 150`, target defaulting to the origin) puts much of the Large
+  arena outside Three.js's default `near`/`far` (`0.5`/`500`) along the light's view axis —
+  task 002 works out the real numbers and the corrected light position/near/far needed.
 - Starting shadow map resolution: **2048×2048** — large enough to avoid obviously blocky shadow
   edges on a mostly-empty pale floor, not so large it's a measurable frame-time cost for a
   single directional light. Tuned for real in task 006 if it turns out too soft/blocky/slow.
