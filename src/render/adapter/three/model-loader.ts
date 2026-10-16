@@ -1,7 +1,15 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-export type ModelName = "player_cell" | "bot_wanderer" | "bot_hunter" | "bot_fleer" | "food";
+export type ModelName =
+  | "player_cell"
+  | "bot_wanderer"
+  | "bot_hunter"
+  | "bot_fleer"
+  | "food"
+  | "prop_empty_dish"
+  | "prop_pipette"
+  | "prop_droplet";
 
 /**
  * Loaded model scenes, keyed by name — no stringly-typed lookups scattered through callers.
@@ -26,6 +34,11 @@ const MODEL_URLS: Record<ModelName, URL> = {
   bot_hunter: new URL("../../../assets/models/bot_hunter.glb", import.meta.url),
   bot_fleer: new URL("../../../assets/models/bot_fleer.glb", import.meta.url),
   food: new URL("../../../assets/models/food.glb", import.meta.url),
+  // Epic 2, task 012: static background decoration (never instanced per-entity like the five
+  // above) — same literal-URL form Vite's bundler needs, no different treatment.
+  prop_empty_dish: new URL("../../../assets/models/prop_empty_dish.glb", import.meta.url),
+  prop_pipette: new URL("../../../assets/models/prop_pipette.glb", import.meta.url),
+  prop_droplet: new URL("../../../assets/models/prop_droplet.glb", import.meta.url),
 };
 
 const MODEL_FILES: Record<ModelName, string> = {
@@ -34,6 +47,9 @@ const MODEL_FILES: Record<ModelName, string> = {
   bot_hunter: "bot_hunter.glb",
   bot_fleer: "bot_fleer.glb",
   food: "food.glb",
+  prop_empty_dish: "prop_empty_dish.glb",
+  prop_pipette: "prop_pipette.glb",
+  prop_droplet: "prop_droplet.glb",
 };
 
 /**

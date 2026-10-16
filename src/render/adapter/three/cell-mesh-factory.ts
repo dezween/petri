@@ -9,6 +9,16 @@ const MAX_FOOD_INSTANCES = 400;
 const MAX_BOTS_PER_BEHAVIOR = 60;
 
 /**
+ * The 5 models that represent gameplay entities with a mass-derived radius — as opposed to
+ * `model-loader.ts`'s 3 `prop_*` names (Epic 2, task 011), which are static background
+ * decoration with no gameplay radius at all (see `static-props.ts`, which places them with a
+ * hand-picked fixed scale instead). Narrowing `BASE_MODEL_RADIUS`/`radiusToScale` to this
+ * subset keeps that distinction a type error, not just a convention: a prop name passed to
+ * `radiusToScale` wouldn't have a meaningful "mass radius" to divide by.
+ */
+type EntityModelName = Exclude<ModelName, "prop_empty_dish" | "prop_pipette" | "prop_droplet">;
+
+/**
  * Each model's "radius" in its own local units, as built by its `tools/blender/generate_*.py`
  * script (grepped from the actual `bpy.ops.mesh.primitive_*_add(radius=...)` calls, not
  * guessed) — the factor a world-space game radius is divided by to get this model's scale.
@@ -17,7 +27,7 @@ const MAX_BOTS_PER_BEHAVIOR = 60;
  * so scaling it up grows both its width and length proportionally, which reads correctly for
  * an elongated shape; there's no single "correct" radius for a non-spherical mesh.
  */
-const BASE_MODEL_RADIUS: Record<ModelName, number> = {
+const BASE_MODEL_RADIUS: Record<EntityModelName, number> = {
   player_cell: 1.0,
   bot_wanderer: 1.0,
   bot_hunter: 0.5,
@@ -30,18 +40,18 @@ const BASE_MODEL_RADIUS: Record<ModelName, number> = {
   food: 0.25,
 };
 
-const BOT_MODEL_FOR_BEHAVIOR: Record<BotBehavior, ModelName> = {
+const BOT_MODEL_FOR_BEHAVIOR: Record<BotBehavior, EntityModelName> = {
   wanderer: "bot_wanderer",
   hunter: "bot_hunter",
   fleer: "bot_fleer",
 };
 
 /** World-space radius -> this model's local scale factor. */
-export function radiusToScale(radius: number, model: ModelName): number {
+export function radiusToScale(radius: number, model: EntityModelName): number {
   return radius / BASE_MODEL_RADIUS[model];
 }
 
-interface ExtractedModel {
+export interface ExtractedModel {
   geometry: THREE.BufferGeometry;
   material: THREE.Material | THREE.Material[];
 }
@@ -56,7 +66,7 @@ interface ExtractedModel {
  * class of bug previously affected `player_cell.glb` before its Blender script joined its
  * membrane + nucleus objects; see cell-mesh-factory.test.ts for the regression test).
  */
-function extractMesh(model: THREE.Object3D): ExtractedModel {
+export function extractMesh(model: THREE.Object3D): ExtractedModel {
   const meshes: THREE.Mesh[] = [];
   model.traverse((child) => {
     if (child instanceof THREE.Mesh) meshes.push(child);
@@ -119,7 +129,7 @@ export class CellMeshFactory {
     }
 
     for (const [behavior, modelName] of Object.entries(BOT_MODEL_FOR_BEHAVIOR) as Array<
-      [BotBehavior, ModelName]
+      [BotBehavior, EntityModelName]
     >) {
       const model = models[modelName];
       if (!model) continue;

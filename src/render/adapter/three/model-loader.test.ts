@@ -9,6 +9,9 @@ const ALL_MODEL_NAMES: ModelName[] = [
   "bot_hunter",
   "bot_fleer",
   "food",
+  "prop_empty_dish",
+  "prop_pipette",
+  "prop_droplet",
 ];
 
 describe("getModelUrl", () => {
