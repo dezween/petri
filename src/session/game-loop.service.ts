@@ -20,6 +20,10 @@ export interface AnimationScheduler {
   cancelFrame(handle: number): void;
 }
 
+/** Largest deltaTime a single tick will ever simulate (seconds) — see the comment at its use
+ * site in `tick()` for why an unclamped gap is dangerous at this game's movement speeds. */
+const MAX_DELTA_TIME = 0.1;
+
 const browserScheduler: AnimationScheduler = {
   requestFrame: (callback) => requestAnimationFrame(callback),
   cancelFrame: (handle) => cancelAnimationFrame(handle),
@@ -67,7 +71,14 @@ export class GameLoopService {
 
   private readonly tick = (timestamp: number): void => {
     // No prior frame to diff against yet — tick with zero movement rather than guessing.
-    const deltaTime = this.lastTimestamp === null ? 0 : (timestamp - this.lastTimestamp) / 1000;
+    // Clamped to MAX_DELTA_TIME: an unclamped gap (a backgrounded/throttled tab, a GC pause,
+    // the browser catching up on deferred work right after a heavy first paint) would let a
+    // single slow frame move every entity by speed * (that whole gap) — at this game's
+    // movement speeds, a half-second stall is enough to teleport a bot clean across the
+    // player's position instead of visibly approaching it. Capping deltaTime means a stall
+    // just makes the game visibly pause/skip, never silently warps anyone.
+    const rawDeltaTime = this.lastTimestamp === null ? 0 : (timestamp - this.lastTimestamp) / 1000;
+    const deltaTime = Math.min(rawDeltaTime, MAX_DELTA_TIME);
     this.lastTimestamp = timestamp;
 
     const direction = this.inputSource.getDirection();

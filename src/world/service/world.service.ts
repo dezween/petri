@@ -19,11 +19,18 @@ import { FoodSpawnerService } from "./food-spawner.service";
 
 export const DEFAULT_ARENA_WIDTH = 1000;
 
-/** Tunable: base player movement speed (units/sec) at mass=1. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
-const BASE_SPEED = 120;
+/**
+ * Tunable: base player movement speed (units/sec) at mass=1. Raised 20x (120 -> 2400) after a
+ * real player reported the original value made the game feel like "watching a cartoon" —
+ * verified by measuring actual on-screen crossing time via Playwright (see the commit this
+ * comment shipped in): at the original value, crossing the starting-zoom viewport took ~50s;
+ * this value targets ~2.5s, closer to the brisk feel of the original agar.io.
+ */
+const BASE_SPEED = 2400;
 
-/** Tunable: base bot movement speed (units/sec) at mass=1 — slightly slower than the player so an equal-mass chase is survivable. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. */
-const BOT_BASE_SPEED = 100;
+/** Tunable: base bot movement speed (units/sec) at mass=1 — kept at the same ~83% ratio to
+ * BASE_SPEED as before the speed-up, so an equal-mass chase is still survivable. */
+const BOT_BASE_SPEED = 2000;
 
 export interface WorldSnapshot {
   player: Player;

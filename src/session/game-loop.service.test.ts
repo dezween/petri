@@ -92,10 +92,27 @@ describe("GameLoopService", () => {
 
     loop.start();
     fireNextFrame(1000); // first frame: no prior timestamp, deltaTime = 0
-    fireNextFrame(1250); // 250ms later
+    fireNextFrame(1060); // 60ms later — comfortably under the stall clamp below
 
     expect(world.tick).toHaveBeenNthCalledWith(1, 0, { x: 0, z: 0 });
-    expect(world.tick).toHaveBeenNthCalledWith(2, 0.25, { x: 0, z: 0 });
+    expect(world.tick).toHaveBeenNthCalledWith(2, 0.06, { x: 0, z: 0 });
+  });
+
+  it("clamps deltaTime so a stalled/backgrounded-tab gap can't let one frame simulate a huge jump", () => {
+    // Regression: at this game's post-speed-up movement constants, an unclamped gap (a
+    // throttled tab, a GC pause, catching up after a heavy first paint) would let a single
+    // slow frame move every entity by speed * (that whole gap) — effectively teleporting a
+    // bot across the player instead of visibly approaching. Reported as "game feels instant
+    // and unfair" after the speed-up; root-caused to this missing clamp.
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const world = createFakeWorldService();
+    const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), {}, scheduler);
+
+    loop.start();
+    fireNextFrame(1000); // first frame: no prior timestamp, deltaTime = 0
+    fireNextFrame(3000); // a 2-full-second stall between frames
+
+    expect(world.tick).toHaveBeenNthCalledWith(2, 0.1, { x: 0, z: 0 }); // capped, not 2.0
   });
 
   it("stop() halts the loop so no further frames are scheduled", () => {
