@@ -52,6 +52,9 @@ src/render/adapter/three/
   membrane-material.ts    # NEW — builds the player membrane's fresnel/glass material,
                           # applied as a post-load swap onto the loaded glTF material (see
                           # task 005)
+  post-processing.ts       # possibly retuned (not logic-changed) — task 001's tilt breaks
+                          # the radial-blur's straight-down-camera assumption; task 006
+                          # re-verifies and retunes innerRadius/outerRadius if needed
 
 tools/blender/
   (no changes — the membrane's base color/alpha stays Blender-authored; the fresnel look is
