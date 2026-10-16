@@ -1,3 +1,5 @@
+import { HtmlAudioPlayerAdapter } from "@/audio/adapter/html-audio/html-audio-player.adapter";
+import { MUSIC_URLS, SFX_URLS } from "@/audio/adapter/html-audio/audio-urls";
 import { MouseInputAdapter } from "@/input/adapter/dom/mouse-input.adapter";
 import { ThreeRenderer } from "@/render/adapter/three/three-renderer";
 import { GameOverAdapter } from "@/ui/adapter/dom/game-over.adapter";
@@ -58,6 +60,7 @@ export function bootstrap(
   renderer.init(elements.canvasContainer);
 
   const inputSource = new MouseInputAdapter(elements.canvasContainer);
+  const audioPlayer = new HtmlAudioPlayerAdapter(SFX_URLS, MUSIC_URLS);
 
   const menu = new MenuAdapter(elements.menu.root, elements.menu.playButton, elements.menu.sizeButtons);
   const hud = new HudAdapter(elements.hud.root, elements.hud.massValue);
@@ -77,6 +80,7 @@ export function bootstrap(
   const sessionState = new SessionState({
     inputSource,
     renderer,
+    audioPlayer,
     screens: { menu, hud, gameOver, victory },
     arenaWidth,
   });

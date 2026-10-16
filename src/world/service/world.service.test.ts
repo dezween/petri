@@ -188,6 +188,75 @@ describe("WorldService.tick — collisions", () => {
   });
 });
 
+describe("WorldService.tick — eaten events", () => {
+  it("reports a player-eats-food event with the correct eater/eaten ids and types", () => {
+    const player = makePlayer({ id: "player", mass: 10, position: { x: 0, z: 0 } });
+    const food = makeFood({ id: "food-1", position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [], [food]);
+
+    const result = world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(result.eatenEvents).toEqual([
+      { eaterId: "player", eaterType: "player", eatenId: "food-1", eatenType: "food" },
+    ]);
+  });
+
+  it("reports a player-eats-bot event, distinct in eatenType from a player-eats-food event", () => {
+    const player = makePlayer({ id: "player", mass: 20, position: { x: 0, z: 0 } });
+    const bot = makeBot({ id: "bot-1", mass: 5, position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [bot], []);
+
+    const result = world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(result.eatenEvents).toEqual([
+      { eaterId: "player", eaterType: "player", eatenId: "bot-1", eatenType: "bot" },
+    ]);
+  });
+
+  it("reports no eatenEvents when the player is eaten instead of eating", () => {
+    const player = makePlayer({ mass: 5, position: { x: 0, z: 0 } });
+    const bot = makeBot({ mass: 50, position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [bot], []);
+
+    const result = world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(result.eatenEvents).toEqual([]);
+  });
+
+  it("reports bot-eats-food and bot-eats-bot events too, not just the player's own eats", () => {
+    const player = makePlayer({ position: { x: 500, z: 500 } }); // far away, uninvolved
+    const bigBot = makeBot({ id: "big", mass: 20, position: { x: -400, z: 0 } });
+    const smallBot = makeBot({ id: "small", mass: 5, position: { x: -400, z: 0 } });
+    const food = makeFood({ id: "food-1", position: { x: -400, z: 0 } });
+    const world = new WorldService(player, [bigBot, smallBot], [food]);
+
+    const result = world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(result.eatenEvents).toContainEqual({
+      eaterId: "big",
+      eaterType: "bot",
+      eatenId: "small",
+      eatenType: "bot",
+    });
+    expect(result.eatenEvents).toContainEqual({
+      eaterId: "big",
+      eaterType: "bot",
+      eatenId: "food-1",
+      eatenType: "food",
+    });
+  });
+
+  it("reports an empty eatenEvents array when nothing overlaps", () => {
+    const player = makePlayer({ mass: 20, position: { x: 0, z: 0 } });
+    const bot = makeBot({ mass: 5, position: { x: 500, z: 500 } });
+    const world = new WorldService(player, [bot], []);
+
+    const result = world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(result.eatenEvents).toEqual([]);
+  });
+});
+
 describe("WorldService.tick — victory cap", () => {
   it("reports victoryReached once the player's radius hits the cap", () => {
     const cap = DEFAULT_ARENA_WIDTH * VICTORY_CAP_FRACTION;

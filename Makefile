@@ -5,7 +5,7 @@ ifeq ($(BLENDER),)
 BLENDER := /Applications/Blender.app/Contents/MacOS/Blender
 endif
 
-.PHONY: install dev build preview blender-models clean
+.PHONY: install dev build preview blender-models generate-audio clean
 
 install:
 	npm install
@@ -26,5 +26,12 @@ blender-models:
 		"$(BLENDER)" --background --python "$$script"; \
 	done
 
+generate-audio:
+	for script in tools/audio/generate_*.py; do \
+		[ -e "$$script" ] || continue; \
+		echo "Running $$script"; \
+		python3 "$$script"; \
+	done
+
 clean:
-	rm -rf node_modules dist tools/blender/__pycache__
+	rm -rf node_modules dist tools/blender/__pycache__ tools/audio/__pycache__

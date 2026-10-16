@@ -1,3 +1,4 @@
+import type { IAudioPlayer } from "@/audio/port/audio.port";
 import type { IInputSource } from "@/input/port/input.port";
 import type { IRenderer } from "@/render/port/renderer.port";
 import { createPlayer } from "@/world/domain/cell.entity";
@@ -40,6 +41,7 @@ export interface SessionStateScreens {
 export interface SessionStateDeps {
   inputSource: IInputSource;
   renderer: IRenderer;
+  audioPlayer: IAudioPlayer;
   screens: SessionStateScreens;
   arenaWidth?: number;
 }
@@ -97,11 +99,16 @@ export class SessionState {
     this.current = "Playing";
     this.showOnly("Playing");
     this.gameLoop.start();
+    // playMusic() replaces whatever was already playing internally (see IAudioPlayer's doc
+    // comment), so Restart calling play() again is already stop-then-restart with no risk of
+    // two loops layering — no explicit stopMusic() needed here first.
+    this.deps.audioPlayer.playMusic("ambient-music");
   }
 
   private returnToMainMenu(): void {
     if (this.current === "MainMenu") return;
     this.stopLoop();
+    this.deps.audioPlayer.stopMusic();
     this.current = "MainMenu";
     this.showOnly("MainMenu");
   }
@@ -109,6 +116,8 @@ export class SessionState {
   private enterGameOver(finalMass: number): void {
     if (this.current === "GameOver") return;
     this.stopLoop();
+    this.deps.audioPlayer.stopMusic();
+    this.deps.audioPlayer.playSfx("death");
     this.current = "GameOver";
     this.showOnly("GameOver", finalMass);
   }
@@ -116,6 +125,8 @@ export class SessionState {
   private enterVictory(finalMass: number): void {
     if (this.current === "Victory") return;
     this.stopLoop();
+    this.deps.audioPlayer.stopMusic();
+    this.deps.audioPlayer.playSfx("victory");
     this.current = "Victory";
     this.showOnly("Victory", finalMass);
   }
@@ -146,6 +157,14 @@ export class SessionState {
       onPlayerEaten: () => this.enterGameOver(worldService.getSnapshot().player.mass),
       onVictoryReached: () => this.enterVictory(worldService.getSnapshot().player.mass),
       onTick: (snapshot) => hud.updateMass(snapshot.player.mass),
+      // Only the player's own eats get a sound — bot-eats-bot/food happen constantly and
+      // silently all over the arena, exactly as in Epic 1; this event stream carries all of
+      // them (see EatenEvent's doc comment) so a future particle trigger (task 009) can reuse
+      // it for bot eats too without this filter getting in its way.
+      onEntityEaten: (event) => {
+        if (event.eaterType !== "player") return;
+        this.deps.audioPlayer.playSfx(event.eatenType === "food" ? "eat-food" : "eat-bot");
+      },
     });
   }
 

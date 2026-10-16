@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { IAudioPlayer } from "@/audio/port/audio.port";
 import type { IInputSource } from "@/input/port/input.port";
 import type { IRenderer } from "@/render/port/renderer.port";
-import type { WorldSnapshot } from "@/world/service/world.service";
+import type { EatenEvent, WorldSnapshot } from "@/world/service/world.service";
 
 interface CapturedCallbacks {
   onPlayerEaten?: () => void;
   onVictoryReached?: () => void;
   onTick?: (snapshot: WorldSnapshot) => void;
+  onEntityEaten?: (event: EatenEvent) => void;
 }
 
 interface FakeGameLoopInstance {
@@ -91,19 +93,33 @@ function createFakeRenderer(): IRenderer {
   return { init: vi.fn(), render: vi.fn(), resize: vi.fn(), setArenaWidth: vi.fn(), dispose: vi.fn() };
 }
 
+function createFakeAudioPlayer(): IAudioPlayer {
+  return {
+    playSfx: vi.fn(),
+    playMusic: vi.fn(),
+    stopMusic: vi.fn(),
+    setSfxVolume: vi.fn(),
+    setMusicVolume: vi.fn(),
+    muteSfx: vi.fn(),
+    muteMusic: vi.fn(),
+  };
+}
+
 function setup() {
   const menu = createFakeMenu();
   const hud = createFakeHud();
   const gameOver = createFakeResultScreen();
   const victory = createFakeResultScreen();
   const renderer = createFakeRenderer();
+  const audioPlayer = createFakeAudioPlayer();
   const deps: SessionStateDeps = {
     inputSource: createFakeInput(),
     renderer,
+    audioPlayer,
     screens: { menu, hud, gameOver, victory },
   };
   const session = new SessionState(deps);
-  return { session, menu, hud, gameOver, victory, renderer };
+  return { session, menu, hud, gameOver, victory, renderer, audioPlayer };
 }
 
 beforeEach(() => {
@@ -293,6 +309,107 @@ describe("SessionState", () => {
 
       expect(renderer.setArenaWidth).toHaveBeenCalledWith(2000);
       expect(gameLoopInstances[1]!.worldService.getSnapshot().arenaWidth).toBe(2000);
+    });
+  });
+
+  describe("audio (Epic 2, tasks 004-005)", () => {
+    it("starts the ambient music loop exactly once on entering Playing", () => {
+      const { menu, audioPlayer } = setup();
+
+      menu.firePlay();
+
+      expect(audioPlayer.playMusic).toHaveBeenCalledTimes(1);
+      expect(audioPlayer.playMusic).toHaveBeenCalledWith("ambient-music");
+    });
+
+    it("stops music on death (GameOver) and plays the death SFX", () => {
+      const { menu, audioPlayer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onPlayerEaten?.();
+
+      expect(audioPlayer.stopMusic).toHaveBeenCalledTimes(1);
+      expect(audioPlayer.playSfx).toHaveBeenCalledWith("death");
+    });
+
+    it("stops music on reaching Victory and plays the victory SFX", () => {
+      const { menu, audioPlayer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onVictoryReached?.();
+
+      expect(audioPlayer.stopMusic).toHaveBeenCalledTimes(1);
+      expect(audioPlayer.playSfx).toHaveBeenCalledWith("victory");
+    });
+
+    it("stops music on manual return to MainMenu from GameOver", () => {
+      const { menu, gameOver, audioPlayer } = setup();
+      menu.firePlay();
+      gameLoopInstances[0]!.callbacks.onPlayerEaten?.();
+      (audioPlayer.stopMusic as ReturnType<typeof vi.fn>).mockClear();
+
+      gameOver.fireMainMenu();
+
+      expect(audioPlayer.stopMusic).toHaveBeenCalledTimes(1);
+    });
+
+    it("restarts music (not layered underneath the old instance) on Restart", () => {
+      const { menu, gameOver, audioPlayer } = setup();
+      menu.firePlay();
+      gameLoopInstances[0]!.callbacks.onPlayerEaten?.();
+      (audioPlayer.playMusic as ReturnType<typeof vi.fn>).mockClear();
+
+      gameOver.fireRestart();
+
+      // SessionState itself doesn't need to call stopMusic() again here — playMusic()
+      // replaces whatever's already playing internally (see IAudioPlayer's doc comment) — but
+      // it must still call playMusic() exactly once for the new Playing session.
+      expect(audioPlayer.playMusic).toHaveBeenCalledTimes(1);
+      expect(audioPlayer.playMusic).toHaveBeenCalledWith("ambient-music");
+    });
+
+    it("plays eat-food SFX when the player eats food, not eat-bot", () => {
+      const { menu, audioPlayer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "food-1",
+        eatenType: "food",
+      });
+
+      expect(audioPlayer.playSfx).toHaveBeenCalledWith("eat-food");
+      expect(audioPlayer.playSfx).not.toHaveBeenCalledWith("eat-bot");
+    });
+
+    it("plays eat-bot SFX when the player eats a bot, not eat-food", () => {
+      const { menu, audioPlayer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "bot-1",
+        eatenType: "bot",
+      });
+
+      expect(audioPlayer.playSfx).toHaveBeenCalledWith("eat-bot");
+      expect(audioPlayer.playSfx).not.toHaveBeenCalledWith("eat-food");
+    });
+
+    it("ignores eatenEvents where a bot is the eater, not the player — no SFX for bot-eats-bot/food", () => {
+      const { menu, audioPlayer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "bot-1",
+        eaterType: "bot",
+        eatenId: "food-1",
+        eatenType: "food",
+      });
+
+      expect(audioPlayer.playSfx).not.toHaveBeenCalled();
     });
   });
 });

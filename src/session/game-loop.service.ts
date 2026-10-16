@@ -1,12 +1,14 @@
 import type { IInputSource } from "@/input/port/input.port";
 import type { IRenderer } from "@/render/port/renderer.port";
-import type { WorldService, WorldSnapshot } from "@/world/service/world.service";
+import type { EatenEvent, WorldService, WorldSnapshot } from "@/world/service/world.service";
 
 export interface GameLoopCallbacks {
   onPlayerEaten?: () => void;
   onVictoryReached?: () => void;
   /** Fired every frame with the same snapshot passed to the renderer — e.g. for a HUD to read live mass. */
   onTick?: (snapshot: WorldSnapshot) => void;
+  /** Fired once per eat occurrence reported by a tick's TickResult.eatenEvents — includes every eater/eaten pair (player or bot), not just the player's own eats, so SFX (Epic 2 task 004) and particle triggers (task 009) can share one hook instead of each building a competing one. */
+  onEntityEaten?: (event: EatenEvent) => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export class GameLoopService {
     const snapshot = this.worldService.getSnapshot();
     this.renderer.render(snapshot);
     this.callbacks.onTick?.(snapshot);
+    for (const event of result.eatenEvents) this.callbacks.onEntityEaten?.(event);
 
     // Structurally exclusive regardless of what TickResult says: today this is unreachable
     // in practice (playerEaten requires the player to be the smaller cell in a collision,
