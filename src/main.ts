@@ -10,34 +10,47 @@ function required<T extends HTMLElement>(id: string): T {
 
 const canvasContainer = required<HTMLElement>("canvas-container");
 
-const { renderer } = bootstrap({
-  canvasContainer,
-  menu: {
-    root: required("menu-screen"),
-    playButton: required("menu-play-button"),
-    sizeButtons: {
-      small: required("menu-size-small"),
-      medium: required("menu-size-medium"),
-      large: required("menu-size-large"),
+const { renderer } = bootstrap(
+  {
+    canvasContainer,
+    menu: {
+      root: required("menu-screen"),
+      playButton: required("menu-play-button"),
+      settingsButton: required("menu-settings-button"),
+      sizeButtons: {
+        small: required("menu-size-small"),
+        medium: required("menu-size-medium"),
+        large: required("menu-size-large"),
+      },
+    },
+    hud: {
+      root: required("hud-overlay"),
+      massValue: required("hud-mass-value"),
+    },
+    gameOver: {
+      root: required("game-over-screen"),
+      scoreValue: required("game-over-score-value"),
+      restartButton: required("game-over-restart-button"),
+      menuButton: required("game-over-menu-button"),
+    },
+    victory: {
+      root: required("victory-screen"),
+      scoreValue: required("victory-score-value"),
+      restartButton: required("victory-restart-button"),
+      menuButton: required("victory-menu-button"),
+    },
+    settings: {
+      root: required("settings-screen"),
+      backButton: required("settings-back-button"),
+      sfxVolume: required("settings-sfx-volume"),
+      sfxMute: required("settings-sfx-mute"),
+      musicVolume: required("settings-music-volume"),
+      musicMute: required("settings-music-mute"),
     },
   },
-  hud: {
-    root: required("hud-overlay"),
-    massValue: required("hud-mass-value"),
-  },
-  gameOver: {
-    root: required("game-over-screen"),
-    scoreValue: required("game-over-score-value"),
-    restartButton: required("game-over-restart-button"),
-    menuButton: required("game-over-menu-button"),
-  },
-  victory: {
-    root: required("victory-screen"),
-    scoreValue: required("victory-score-value"),
-    restartButton: required("victory-restart-button"),
-    menuButton: required("victory-menu-button"),
-  },
-});
+  undefined,
+  window.localStorage,
+);
 
 window.addEventListener("resize", () => {
   renderer.resize(canvasContainer.clientWidth, canvasContainer.clientHeight);

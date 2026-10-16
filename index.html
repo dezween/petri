@@ -17,6 +17,22 @@
         <button id="menu-size-large" type="button" class="size-picker__button">Large</button>
       </div>
       <button id="menu-play-button" type="button" class="screen__button">Play</button>
+      <button id="menu-settings-button" type="button" class="screen__button screen__button--secondary">Settings</button>
+    </div>
+
+    <div id="settings-screen" class="screen" hidden>
+      <h1 class="screen__title">Settings</h1>
+      <div class="settings-row">
+        <label class="settings-row__label" for="settings-sfx-volume">SFX Volume</label>
+        <input id="settings-sfx-volume" type="range" min="0" max="1" step="0.01" />
+        <label class="settings-row__mute"><input id="settings-sfx-mute" type="checkbox" /> Mute</label>
+      </div>
+      <div class="settings-row">
+        <label class="settings-row__label" for="settings-music-volume">Music Volume</label>
+        <input id="settings-music-volume" type="range" min="0" max="1" step="0.01" />
+        <label class="settings-row__mute"><input id="settings-music-mute" type="checkbox" /> Mute</label>
+      </div>
+      <button id="settings-back-button" type="button" class="screen__button screen__button--secondary">Back</button>
     </div>
 
     <div id="hud-overlay" class="hud" hidden>

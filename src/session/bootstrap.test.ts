@@ -22,6 +22,7 @@ const menuAdapterCalls: Call[] = [];
 const hudAdapterCalls: Call[] = [];
 const gameOverAdapterCalls: Call[] = [];
 const victoryAdapterCalls: Call[] = [];
+const settingsAdapterCalls: Call[] = [];
 const sessionStateCalls: Call[] = [];
 
 vi.mock("@/render/adapter/three/three-renderer", () => ({
@@ -57,7 +58,7 @@ vi.mock("@/audio/adapter/html-audio/html-audio-player.adapter", () => ({
 vi.mock("@/ui/adapter/dom/menu.adapter", () => ({
   MenuAdapter: vi.fn().mockImplementation((...args: unknown[]) => {
     menuAdapterCalls.push({ args });
-    return { __args: args, show: vi.fn(), hide: vi.fn(), onPlay: vi.fn() };
+    return { __args: args, show: vi.fn(), hide: vi.fn(), onPlay: vi.fn(), onOpenSettings: vi.fn() };
   }),
 }));
 
@@ -82,6 +83,22 @@ vi.mock("@/ui/adapter/dom/victory.adapter", () => ({
   }),
 }));
 
+vi.mock("@/ui/adapter/dom/settings.adapter", async () => {
+  const actual = await vi.importActual<typeof import("@/ui/adapter/dom/settings.adapter")>(
+    "@/ui/adapter/dom/settings.adapter",
+  );
+  return {
+    // loadAudioSettings/applyAudioSettings are plain functions with no DOM/class dependency —
+    // kept real so this test also exercises bootstrap.ts's actual startup-settings wiring, not
+    // just that *a* SettingsAdapter got constructed.
+    ...actual,
+    SettingsAdapter: vi.fn().mockImplementation((...args: unknown[]) => {
+      settingsAdapterCalls.push({ args });
+      return { __args: args, show: vi.fn(), hide: vi.fn(), onBack: vi.fn() };
+    }),
+  };
+});
+
 vi.mock("@/ui/session-state", () => ({
   SessionState: vi.fn().mockImplementation((...args: unknown[]) => {
     sessionStateCalls.push({ args });
@@ -100,12 +117,17 @@ function fakeButton(): HTMLButtonElement {
   return {} as HTMLButtonElement;
 }
 
+function fakeInput(): HTMLInputElement {
+  return { value: "", checked: false } as unknown as HTMLInputElement;
+}
+
 function buildElements(): BootstrapElements {
   return {
     canvasContainer: fakeElement(),
     menu: {
       root: fakeElement(),
       playButton: fakeButton(),
+      settingsButton: fakeButton(),
       sizeButtons: { small: fakeButton(), medium: fakeButton(), large: fakeButton() },
     },
     hud: { root: fakeElement(), massValue: fakeElement() },
@@ -121,6 +143,14 @@ function buildElements(): BootstrapElements {
       restartButton: fakeButton(),
       menuButton: fakeButton(),
     },
+    settings: {
+      root: fakeElement(),
+      backButton: fakeButton(),
+      sfxVolume: fakeInput(),
+      sfxMute: fakeInput(),
+      musicVolume: fakeInput(),
+      musicMute: fakeInput(),
+    },
   };
 }
 
@@ -132,6 +162,7 @@ beforeEach(() => {
   hudAdapterCalls.length = 0;
   gameOverAdapterCalls.length = 0;
   victoryAdapterCalls.length = 0;
+  settingsAdapterCalls.length = 0;
   sessionStateCalls.length = 0;
 });
 
@@ -161,7 +192,7 @@ describe("bootstrap", () => {
     expect(mouseInputCalls[0]!.args).toEqual([elements.canvasContainer]);
   });
 
-  it("constructs MenuAdapter with the menu's own root, play button, and size buttons, not another screen's elements", () => {
+  it("constructs MenuAdapter with the menu's own root, play button, settings button, and size buttons, not another screen's elements", () => {
     const elements = buildElements();
 
     bootstrap(elements);
@@ -169,6 +200,7 @@ describe("bootstrap", () => {
     expect(menuAdapterCalls[0]!.args).toEqual([
       elements.menu.root,
       elements.menu.playButton,
+      elements.menu.settingsButton,
       elements.menu.sizeButtons,
     ]);
   });
@@ -207,7 +239,7 @@ describe("bootstrap", () => {
     ]);
   });
 
-  it("constructs SessionState with the exact renderer instance it returns, the four screens, and the same arenaWidth passed to ThreeRenderer", () => {
+  it("constructs SessionState with the exact renderer instance it returns, all five screens, and the same arenaWidth passed to ThreeRenderer", () => {
     const elements = buildElements();
 
     const { renderer, sessionState } = bootstrap(elements, 1500);
@@ -217,7 +249,7 @@ describe("bootstrap", () => {
       inputSource: unknown;
       renderer: unknown;
       audioPlayer: unknown;
-      screens: { menu: unknown; hud: unknown; gameOver: unknown; victory: unknown };
+      screens: { menu: unknown; hud: unknown; gameOver: unknown; victory: unknown; settings: unknown };
       arenaWidth: number;
     };
 
@@ -225,7 +257,65 @@ describe("bootstrap", () => {
     // second, independently-constructed one.
     expect(deps.renderer).toBe(renderer);
     expect(deps.arenaWidth).toBe(1500);
+    expect(deps.screens.settings).toBeDefined();
     expect(sessionState).toBeDefined();
+  });
+
+  describe("settings (Epic 2, task 006)", () => {
+    it("constructs exactly one SettingsAdapter, wired to the same IAudioPlayer instance passed into SessionState", () => {
+      const elements = buildElements();
+
+      bootstrap(elements);
+
+      expect(settingsAdapterCalls).toHaveLength(1);
+      const [controls, audioPlayer] = settingsAdapterCalls[0]!.args as [unknown, unknown];
+      expect(controls).toEqual({
+        root: elements.settings.root,
+        backButton: elements.settings.backButton,
+        sfxVolume: elements.settings.sfxVolume,
+        sfxMute: elements.settings.sfxMute,
+        musicVolume: elements.settings.musicVolume,
+        musicMute: elements.settings.musicMute,
+      });
+      const deps = sessionStateCalls[0]!.args[0] as { audioPlayer: unknown };
+      expect(audioPlayer).toBe(deps.audioPlayer);
+    });
+
+    it("applies freshly-loaded (default, since storage is empty) settings to the audio player before SessionState is constructed", () => {
+      const elements = buildElements();
+
+      bootstrap(elements);
+
+      // HtmlAudioPlayerAdapter is mocked, but the mock's returned instance is a real object
+      // whose setSfxVolume/etc. methods bootstrap.ts calls directly — assert via the same
+      // instance SettingsAdapter and SessionState both received.
+      const deps = sessionStateCalls[0]!.args[0] as {
+        audioPlayer: { setSfxVolume: ReturnType<typeof vi.fn>; setMusicVolume: ReturnType<typeof vi.fn> };
+      };
+      expect(deps.audioPlayer.setSfxVolume).toHaveBeenCalled();
+      expect(deps.audioPlayer.setMusicVolume).toHaveBeenCalled();
+    });
+
+    it("passes a usable in-memory storage by default (bootstrap() doesn't require a real localStorage)", () => {
+      const elements = buildElements();
+
+      expect(() => bootstrap(elements)).not.toThrow();
+    });
+
+    it("accepts an explicit storage (e.g. the real window.localStorage from main.ts) as the third argument", () => {
+      const elements = buildElements();
+      const store = new Map<string, string>();
+      const storage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+      };
+
+      bootstrap(elements, DEFAULT_ARENA_WIDTH, storage);
+
+      expect(settingsAdapterCalls[0]!.args[2]).toBe(storage);
+    });
   });
 
   it("constructs exactly one HtmlAudioPlayerAdapter and passes that same instance into SessionState", () => {

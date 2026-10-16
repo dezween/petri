@@ -19,14 +19,17 @@ export interface MenuSizeButtons {
  */
 export class MenuAdapter implements MenuScreen {
   private playHandler: ((arenaWidth: number) => void) | null = null;
+  private openSettingsHandler: (() => void) | null = null;
   private selectedArenaWidth = ARENA_WIDTH_SMALL;
 
   constructor(
     private readonly root: HTMLElement,
     private readonly playButton: HTMLButtonElement,
+    private readonly settingsButton: HTMLButtonElement,
     private readonly sizeButtons: MenuSizeButtons,
   ) {
     this.playButton.addEventListener("click", () => this.playHandler?.(this.selectedArenaWidth));
+    this.settingsButton.addEventListener("click", () => this.openSettingsHandler?.());
     this.sizeButtons.small.addEventListener("click", () => this.selectSize(ARENA_WIDTH_SMALL));
     this.sizeButtons.medium.addEventListener("click", () => this.selectSize(ARENA_WIDTH_MEDIUM));
     this.sizeButtons.large.addEventListener("click", () => this.selectSize(ARENA_WIDTH_LARGE));
@@ -35,6 +38,10 @@ export class MenuAdapter implements MenuScreen {
 
   onPlay(handler: (arenaWidth: number) => void): void {
     this.playHandler = handler;
+  }
+
+  onOpenSettings(handler: () => void): void {
+    this.openSettingsHandler = handler;
   }
 
   show(): void {

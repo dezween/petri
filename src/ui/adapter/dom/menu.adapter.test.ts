@@ -26,13 +26,15 @@ function createFakeSizeButtons() {
 function setup() {
   const root = createFakeElement();
   const playButton = createFakeButton();
+  const settingsButton = createFakeButton();
   const sizeButtons = createFakeSizeButtons();
   const adapter = new MenuAdapter(
     root as unknown as HTMLElement,
     playButton as unknown as HTMLButtonElement,
+    settingsButton as unknown as HTMLButtonElement,
     sizeButtons as unknown as import("./menu.adapter").MenuSizeButtons,
   );
-  return { root, playButton, sizeButtons, adapter };
+  return { root, playButton, settingsButton, sizeButtons, adapter };
 }
 
 describe("MenuAdapter", () => {
@@ -66,6 +68,30 @@ describe("MenuAdapter", () => {
 
     adapter.show();
     expect(root.hidden).toBe(false);
+  });
+
+  describe("settings button (Epic 2, task 007)", () => {
+    it("registers a click listener on the settings button at construction", () => {
+      const { settingsButton } = setup();
+
+      expect(settingsButton.addEventListener).toHaveBeenCalledWith("click", expect.any(Function));
+    });
+
+    it("calls the onOpenSettings handler when the settings button is clicked", () => {
+      const { settingsButton, adapter } = setup();
+      const onOpenSettings = vi.fn();
+
+      adapter.onOpenSettings(onOpenSettings);
+      settingsButton.click();
+
+      expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing on click when no onOpenSettings handler has been registered yet", () => {
+      const { settingsButton } = setup();
+
+      expect(() => settingsButton.click()).not.toThrow();
+    });
   });
 
   describe("size picker (Epic 2, task 002)", () => {

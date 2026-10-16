@@ -42,19 +42,41 @@ import { SessionState, type HudScreen, type MenuScreen, type SessionStateDeps } 
 
 function createFakeMenu() {
   let playHandler: ((arenaWidth: number) => void) | null = null;
-  const menu: MenuScreen & { firePlay: (arenaWidth?: number) => void } = {
+  let openSettingsHandler: (() => void) | null = null;
+  const menu: MenuScreen & { firePlay: (arenaWidth?: number) => void; fireOpenSettings: () => void } = {
     show: vi.fn(),
     hide: vi.fn(),
     onPlay: vi.fn((handler: (arenaWidth: number) => void) => {
       playHandler = handler;
+    }),
+    onOpenSettings: vi.fn((handler: () => void) => {
+      openSettingsHandler = handler;
     }),
     // Defaults to Small (1000) so existing tests that don't care about arena width keep
     // exercising the same behavior Epic 1 had.
     firePlay(arenaWidth = 1000) {
       playHandler?.(arenaWidth);
     },
+    fireOpenSettings() {
+      openSettingsHandler?.();
+    },
   };
   return menu;
+}
+
+function createFakeSettingsScreen() {
+  let backHandler: (() => void) | null = null;
+  const screen = {
+    show: vi.fn(),
+    hide: vi.fn(),
+    onBack: vi.fn((handler: () => void) => {
+      backHandler = handler;
+    }),
+    fireBack() {
+      backHandler?.();
+    },
+  };
+  return screen;
 }
 
 function createFakeResultScreen() {
@@ -110,16 +132,17 @@ function setup() {
   const hud = createFakeHud();
   const gameOver = createFakeResultScreen();
   const victory = createFakeResultScreen();
+  const settings = createFakeSettingsScreen();
   const renderer = createFakeRenderer();
   const audioPlayer = createFakeAudioPlayer();
   const deps: SessionStateDeps = {
     inputSource: createFakeInput(),
     renderer,
     audioPlayer,
-    screens: { menu, hud, gameOver, victory },
+    screens: { menu, hud, gameOver, victory, settings },
   };
   const session = new SessionState(deps);
-  return { session, menu, hud, gameOver, victory, renderer, audioPlayer };
+  return { session, menu, hud, gameOver, victory, settings, renderer, audioPlayer };
 }
 
 beforeEach(() => {
@@ -410,6 +433,62 @@ describe("SessionState", () => {
       });
 
       expect(audioPlayer.playSfx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("settings (Epic 2, task 007)", () => {
+    it("opening Settings from MainMenu hides the menu and shows settings, without changing `state`", () => {
+      const { session, menu, settings } = setup();
+
+      menu.fireOpenSettings();
+
+      expect(session.state).toBe("MainMenu"); // modal overlay, not a new SessionStateName
+      expect(menu.hide).toHaveBeenCalledTimes(1);
+      expect(settings.show).toHaveBeenCalledTimes(1);
+    });
+
+    it("Back from Settings hides settings and shows the menu again", () => {
+      const { menu, settings } = setup();
+      menu.fireOpenSettings();
+
+      settings.fireBack();
+
+      expect(settings.hide).toHaveBeenCalledTimes(1);
+      // Once at MainMenu init, once on returning from Settings.
+      expect(menu.show).toHaveBeenCalledTimes(2);
+    });
+
+    it("is a no-op while Playing — Settings has no button during an active game", () => {
+      const { session, menu, settings } = setup();
+      menu.firePlay();
+
+      menu.fireOpenSettings();
+
+      expect(session.state).toBe("Playing");
+      expect(settings.show).not.toHaveBeenCalled();
+    });
+
+    it("all 7 of Epic 1's original transitions still work unchanged alongside Settings", () => {
+      const { session, menu, gameOver, victory } = setup();
+
+      menu.firePlay();
+      expect(session.state).toBe("Playing");
+
+      gameLoopInstances[0]!.callbacks.onPlayerEaten?.();
+      expect(session.state).toBe("GameOver");
+
+      gameOver.fireRestart();
+      expect(session.state).toBe("Playing");
+
+      gameLoopInstances[1]!.callbacks.onVictoryReached?.();
+      expect(session.state).toBe("Victory");
+
+      victory.fireRestart();
+      expect(session.state).toBe("Playing");
+
+      gameLoopInstances[2]!.callbacks.onPlayerEaten?.();
+      gameOver.fireMainMenu();
+      expect(session.state).toBe("MainMenu");
     });
   });
 });
