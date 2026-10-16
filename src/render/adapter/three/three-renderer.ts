@@ -9,6 +9,7 @@ import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCame
 import { loadAllModels } from "./model-loader";
 import { CellMeshFactory } from "./cell-mesh-factory";
 import { ParticleSystem } from "./particles";
+import { buildStaticProps } from "./static-props";
 
 /**
  * `IRenderer` implementation backed by Three.js — the only place in this codebase that
@@ -23,6 +24,7 @@ export class ThreeRenderer implements IRenderer {
   private container?: HTMLElement;
   private meshFactory?: CellMeshFactory;
   private readonly particleSystem: ParticleSystem;
+  private staticProps?: THREE.Group;
 
   constructor(arenaWidth: number = DEFAULT_ARENA_WIDTH) {
     this.scene = createScene(arenaWidth);
@@ -46,6 +48,13 @@ export class ThreeRenderer implements IRenderer {
         // rather than rendering nothing at all.
         this.meshFactory = new CellMeshFactory(models);
         this.scene.add(this.meshFactory.group);
+
+        // Epic 2, task 012: static background decoration, built from the same partial
+        // ModelCache — a missing/corrupt prop model degrades only that one prop (see
+        // static-props.ts), never the gameplay-critical meshes above. Loaded once here and
+        // never touched again; no per-frame updates.
+        this.staticProps = buildStaticProps(models);
+        this.scene.add(this.staticProps);
       })
       .catch((err: unknown) => {
         // loadAllModels itself no longer rejects for per-model load failures (those degrade
@@ -107,6 +116,17 @@ export class ThreeRenderer implements IRenderer {
       this.scene.remove(this.meshFactory.group);
       this.meshFactory.dispose();
       this.meshFactory = undefined;
+    }
+    if (this.staticProps) {
+      this.scene.remove(this.staticProps);
+      for (const child of this.staticProps.children) {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          for (const m of mats) m.dispose();
+        }
+      }
+      this.staticProps = undefined;
     }
     // createScene() (constructor) allocates the static floor/rim geometry+materials, which
     // THREE.WebGLRenderer.dispose() does NOT free for you — it only disposes renderer-internal
