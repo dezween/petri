@@ -10,9 +10,27 @@ interface ClientRectLike {
 
 /**
  * Pure direction math, exported so it's unit-testable without a real DOM element.
- * Screen-right maps to world +x and screen-down maps to world +z — this matches the
- * top-down camera's up=(0,0,-1) orientation (see render/adapter/three/camera.ts), where
- * screen-up corresponds to world -z.
+ *
+ * Screen-right maps to world -x and screen-down maps to world -z. This is NOT the mapping you'd
+ * guess by eye — it's been verified directly against `THREE.Camera.matrixWorld`'s actual basis
+ * vectors (not hand-derived trig, which is easy to get subtly wrong with cross-product
+ * handedness), both for the current tilted camera and the pre-Epic-3 straight-down one, by
+ * running real `three` code:
+ *
+ *   old camera (up forced to (0,0,-1), used through Epic 1/2): local +X (screen-right) -> world
+ *   +X, local +Y (screen-up) -> world -Z. That's where this function's ORIGINAL sign convention
+ *   (screen-right -> +x, screen-down -> +z) came from, and it was correct for that camera.
+ *
+ *   current camera (Epic 3 task 001 tilted it to 67° elevation, up back to THREE's default
+ *   (0,1,0) — see render/adapter/three/camera.ts): local +X (screen-right) -> world -X, local +Y
+ *   (screen-up) -> world +Z. Both axes flipped relative to the old camera — not just one — which
+ *   is why the tilt silently broke movement into feeling fully inverted (cursor-right drove the
+ *   player left, cursor-up drove it down) until a player actually reported it.
+ *
+ * If the camera's tilt/position math in camera.ts ever changes again, re-derive this by running
+ * `camera.matrixWorld.extractBasis(right, up, forward)` on the real camera and reading off
+ * `right`'s and `up`'s world-space X/Z components — don't hand-derive it from the elevation
+ * angle, and don't assume whichever sign convention "looks right" by inspection.
  */
 export function computeDirectionFromPointer(
   clientX: number,
@@ -28,7 +46,7 @@ export function computeDirectionFromPointer(
   const length = Math.hypot(dx, dz);
   if (length === 0) return { x: 0, z: 0 };
 
-  return { x: dx / length, z: dz / length };
+  return { x: -dx / length, z: -dz / length };
 }
 
 /**
