@@ -154,14 +154,33 @@ export function disposeObject3D(object: THREE.Object3D): void {
 
 const IDENTITY_QUATERNION = new THREE.Quaternion();
 
+/**
+ * Epic 3, task 003: every entity's local origin sits at the vertical center of its model (the
+ * Blender scripts build spheres centered on their own origin), and every entity was positioned
+ * at exactly `y=0` — the floor's own height — which puts roughly the *lower half* of every
+ * round model geometrically embedded in the floor. That's invisible without shadows, but once
+ * task 003 made entities cast them, a sphere whose shadow falls almost directly beneath its own
+ * mostly-submerged silhouette is largely self-occluded from this camera's angle — confirmed via
+ * a real Playwright screenshot: `bot_hunter` (an elongated rod, which still protrudes well above
+ * y=0 despite the same y=0 origin) cast a clearly visible shadow, while the player and
+ * `bot_wanderer` (both near-spherical) cast none at any zoom/mass tested. Raising entities by a
+ * fraction of their own world-space radius surfaces enough of each sphere above the floor for
+ * its shadow to actually be visible, while staying modest enough to still read as "sitting in
+ * the dish" rather than floating above it — tuned for real in task 006's balance pass, like
+ * every other new-in-Epic-3 visual constant. Task 004's bobbing animation adds a small
+ * *oscillating* offset on top of this fixed base elevation, not a replacement for it.
+ */
+const GROUND_ELEVATION_FRACTION = 0.4;
+
 function composeAt(
   matrix: THREE.Matrix4,
   x: number,
   z: number,
   scale: number,
+  radius: number,
 ): THREE.Matrix4 {
   return matrix.compose(
-    new THREE.Vector3(x, 0, z),
+    new THREE.Vector3(x, radius * GROUND_ELEVATION_FRACTION, z),
     IDENTITY_QUATERNION,
     new THREE.Vector3(scale, scale, scale),
   );
@@ -228,7 +247,11 @@ export class CellMeshFactory {
 
   private updatePlayer(player: WorldSnapshot["player"]): void {
     if (!this.playerMesh) return; // player_cell model failed to load — nothing to update
-    this.playerMesh.position.set(player.position.x, 0, player.position.z);
+    this.playerMesh.position.set(
+      player.position.x,
+      player.radius * GROUND_ELEVATION_FRACTION,
+      player.position.z,
+    );
     const scale = radiusToScale(player.radius, "player_cell");
     this.playerMesh.scale.setScalar(scale);
   }
@@ -239,7 +262,7 @@ export class CellMeshFactory {
     const matrix = new THREE.Matrix4();
     for (let i = 0; i < count; i++) {
       const f = food[i];
-      composeAt(matrix, f.position.x, f.position.z, radiusToScale(f.radius, "food"));
+      composeAt(matrix, f.position.x, f.position.z, radiusToScale(f.radius, "food"), f.radius);
       this.foodMesh.setMatrixAt(i, matrix);
     }
     this.foodMesh.count = count;
@@ -260,7 +283,7 @@ export class CellMeshFactory {
 
       for (let i = 0; i < count; i++) {
         const bot = list[i];
-        composeAt(matrix, bot.position.x, bot.position.z, radiusToScale(bot.radius, model));
+        composeAt(matrix, bot.position.x, bot.position.z, radiusToScale(bot.radius, model), bot.radius);
         mesh.setMatrixAt(i, matrix);
       }
       mesh.count = count;
