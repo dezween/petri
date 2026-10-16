@@ -45,4 +45,21 @@ describe("createScene", () => {
 
     expect(smallBench.parameters.radius).toBeCloseTo(largeBench.parameters.radius);
   });
+
+  it("makes the floor, rim, and lab-bench all receive shadows (none of them cast)", () => {
+    const scene = createScene(1000);
+    const floor = scene.getObjectByName("arena-floor") as THREE.Mesh;
+    const rim = scene.getObjectByName("arena-rim") as THREE.Mesh;
+    const bench = scene.getObjectByName("lab-bench") as THREE.Mesh;
+
+    expect(floor.receiveShadow).toBe(true);
+    expect(rim.receiveShadow).toBe(true);
+    expect(bench.receiveShadow).toBe(true);
+
+    // Nothing in the scene shadows onto these from below (SPEC.md's Design Decision 2) — they
+    // should stay receivers only.
+    expect(floor.castShadow).toBe(false);
+    expect(rim.castShadow).toBe(false);
+    expect(bench.castShadow).toBe(false);
+  });
 });

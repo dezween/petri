@@ -40,6 +40,11 @@ export class ThreeRenderer implements IRenderer {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
+    // Epic 3, task 002: soft shadows — a game about translucent organic cells shouldn't have
+    // hard-edged shadows. The directional light in lighting.ts is the one caster; entity meshes
+    // (task 003) and the arena floor/rim/bench (scene.ts) are the casters/receivers.
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     updateCameraAspect(this.camera, safeAspect(container.clientWidth, container.clientHeight));
     container.appendChild(this.renderer.domElement);
 
