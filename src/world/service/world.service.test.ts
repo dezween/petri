@@ -197,20 +197,38 @@ describe("WorldService.tick — eaten events", () => {
     const result = world.tick(1 / 60, { x: 0, z: 0 });
 
     expect(result.eatenEvents).toEqual([
-      { eaterId: "player", eaterType: "player", eatenId: "food-1", eatenType: "food" },
+      {
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "food-1",
+        eatenType: "food",
+        position: { x: 0, z: 0 },
+      },
     ]);
   });
 
   it("reports a player-eats-bot event, distinct in eatenType from a player-eats-food event", () => {
     const player = makePlayer({ id: "player", mass: 20, position: { x: 0, z: 0 } });
-    const bot = makeBot({ id: "bot-1", mass: 5, position: { x: 0, z: 0 } });
+    const bot = makeBot({ id: "bot-1", mass: 5, position: { x: 0, z: 0 }, behavior: "hunter" });
     const world = new WorldService(player, [bot], []);
 
     const result = world.tick(1 / 60, { x: 0, z: 0 });
 
-    expect(result.eatenEvents).toEqual([
-      { eaterId: "player", eaterType: "player", eatenId: "bot-1", eatenType: "bot" },
+    // The eaten bot moves under its own AI before collisions resolve this tick (every bot
+    // behavior moves every tick, there's no "stationary" one), so its captured eat-position
+    // isn't exactly its spawn point — only the non-position fields are asserted exactly here;
+    // position correctness (it reflects *some* real, finite coordinate) is checked separately.
+    expect(result.eatenEvents).toMatchObject([
+      {
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "bot-1",
+        eatenType: "bot",
+        eatenBehavior: "hunter",
+      },
     ]);
+    expect(Number.isFinite(result.eatenEvents[0]!.position.x)).toBe(true);
+    expect(Number.isFinite(result.eatenEvents[0]!.position.z)).toBe(true);
   });
 
   it("reports no eatenEvents when the player is eaten instead of eating", () => {
@@ -226,23 +244,31 @@ describe("WorldService.tick — eaten events", () => {
   it("reports bot-eats-food and bot-eats-bot events too, not just the player's own eats", () => {
     const player = makePlayer({ position: { x: 500, z: 500 } }); // far away, uninvolved
     const bigBot = makeBot({ id: "big", mass: 20, position: { x: -400, z: 0 } });
-    const smallBot = makeBot({ id: "small", mass: 5, position: { x: -400, z: 0 } });
+    const smallBot = makeBot({ id: "small", mass: 5, position: { x: -400, z: 0 }, behavior: "fleer" });
     const food = makeFood({ id: "food-1", position: { x: -400, z: 0 } });
     const world = new WorldService(player, [bigBot, smallBot], [food]);
 
     const result = world.tick(1 / 60, { x: 0, z: 0 });
 
-    expect(result.eatenEvents).toContainEqual({
-      eaterId: "big",
-      eaterType: "bot",
-      eatenId: "small",
-      eatenType: "bot",
-    });
+    // `small`'s eat-position reflects post-movement coordinates (bots move every tick, see the
+    // comment in the player-eats-bot test above) — assert the other fields exactly, position
+    // only loosely (it's generated near -400,0, the shared spawn point, not exactly on it).
+    expect(result.eatenEvents).toContainEqual(
+      expect.objectContaining({
+        eaterId: "big",
+        eaterType: "bot",
+        eatenId: "small",
+        eatenType: "bot",
+        eatenBehavior: "fleer",
+      }),
+    );
+    // `food-1` never moves on its own, so its eat-position is exactly its spawn point.
     expect(result.eatenEvents).toContainEqual({
       eaterId: "big",
       eaterType: "bot",
       eatenId: "food-1",
       eatenType: "food",
+      position: { x: -400, z: 0 },
     });
   });
 

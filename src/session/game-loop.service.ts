@@ -73,7 +73,7 @@ export class GameLoopService {
     const direction = this.inputSource.getDirection();
     const result = this.worldService.tick(deltaTime, direction);
     const snapshot = this.worldService.getSnapshot();
-    this.renderer.render(snapshot);
+    this.renderer.render(snapshot, deltaTime);
     this.callbacks.onTick?.(snapshot);
     for (const event of result.eatenEvents) this.callbacks.onEntityEaten?.(event);
 
