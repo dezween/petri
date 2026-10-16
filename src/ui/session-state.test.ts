@@ -13,6 +13,10 @@ interface FakeGameLoopInstance {
   callbacks: CapturedCallbacks;
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  // The real WorldService instance SessionState constructed for this loop — captured so tests
+  // can confirm its arenaWidth (via getSnapshot()) agrees with whatever width was requested,
+  // without reaching into SessionState's own private fields.
+  worldService: { getSnapshot: () => { arenaWidth: number } };
 }
 
 const gameLoopInstances: FakeGameLoopInstance[] = [];
@@ -25,7 +29,8 @@ const gameLoopInstances: FakeGameLoopInstance[] = [];
 vi.mock("@/session/game-loop.service", () => ({
   GameLoopService: vi.fn().mockImplementation((..._args: unknown[]) => {
     const callbacks = (_args[3] ?? {}) as CapturedCallbacks;
-    const instance: FakeGameLoopInstance = { callbacks, start: vi.fn(), stop: vi.fn() };
+    const worldService = _args[1] as FakeGameLoopInstance["worldService"];
+    const instance: FakeGameLoopInstance = { callbacks, start: vi.fn(), stop: vi.fn(), worldService };
     gameLoopInstances.push(instance);
     return instance;
   }),
@@ -34,15 +39,17 @@ vi.mock("@/session/game-loop.service", () => ({
 import { SessionState, type HudScreen, type MenuScreen, type SessionStateDeps } from "./session-state";
 
 function createFakeMenu() {
-  let playHandler: (() => void) | null = null;
-  const menu: MenuScreen & { firePlay: () => void } = {
+  let playHandler: ((arenaWidth: number) => void) | null = null;
+  const menu: MenuScreen & { firePlay: (arenaWidth?: number) => void } = {
     show: vi.fn(),
     hide: vi.fn(),
-    onPlay: vi.fn((handler: () => void) => {
+    onPlay: vi.fn((handler: (arenaWidth: number) => void) => {
       playHandler = handler;
     }),
-    firePlay() {
-      playHandler?.();
+    // Defaults to Small (1000) so existing tests that don't care about arena width keep
+    // exercising the same behavior Epic 1 had.
+    firePlay(arenaWidth = 1000) {
+      playHandler?.(arenaWidth);
     },
   };
   return menu;
@@ -81,7 +88,7 @@ function createFakeInput(): IInputSource {
 }
 
 function createFakeRenderer(): IRenderer {
-  return { init: vi.fn(), render: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
+  return { init: vi.fn(), render: vi.fn(), resize: vi.fn(), setArenaWidth: vi.fn(), dispose: vi.fn() };
 }
 
 function setup() {
@@ -89,13 +96,14 @@ function setup() {
   const hud = createFakeHud();
   const gameOver = createFakeResultScreen();
   const victory = createFakeResultScreen();
+  const renderer = createFakeRenderer();
   const deps: SessionStateDeps = {
     inputSource: createFakeInput(),
-    renderer: createFakeRenderer(),
+    renderer,
     screens: { menu, hud, gameOver, victory },
   };
   const session = new SessionState(deps);
-  return { session, menu, hud, gameOver, victory };
+  return { session, menu, hud, gameOver, victory, renderer };
 }
 
 beforeEach(() => {
@@ -232,5 +240,59 @@ describe("SessionState", () => {
     // must not throw or do anything observable.
     expect(() => gameOver.fireMainMenu()).not.toThrow();
     expect(session.state).toBe("MainMenu");
+  });
+
+  describe("arena size threading (Epic 2, task 001)", () => {
+    it("defaults to 1000 when the menu is never given an explicit choice", () => {
+      const { menu, renderer } = setup();
+
+      menu.firePlay(1000);
+
+      expect(renderer.setArenaWidth).toHaveBeenCalledWith(1000);
+      expect(gameLoopInstances[0]!.worldService.getSnapshot().arenaWidth).toBe(1000);
+    });
+
+    it("threads a Medium (1500) choice to both the renderer and the world it builds", () => {
+      const { menu, renderer } = setup();
+
+      menu.firePlay(1500);
+
+      expect(renderer.setArenaWidth).toHaveBeenCalledWith(1500);
+      expect(gameLoopInstances[0]!.worldService.getSnapshot().arenaWidth).toBe(1500);
+    });
+
+    it("threads a Large (2000) choice to both the renderer and the world it builds", () => {
+      const { menu, renderer } = setup();
+
+      menu.firePlay(2000);
+
+      expect(renderer.setArenaWidth).toHaveBeenCalledWith(2000);
+      expect(gameLoopInstances[0]!.worldService.getSnapshot().arenaWidth).toBe(2000);
+    });
+
+    it("calls renderer.setArenaWidth before building the new game loop, not after", () => {
+      const { menu, renderer } = setup();
+      const callOrder: string[] = [];
+      (renderer.setArenaWidth as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callOrder.push("setArenaWidth");
+      });
+
+      menu.firePlay(1500);
+      callOrder.push("gameLoopConstructed"); // gameLoopInstances[0] already exists by now
+
+      expect(callOrder).toEqual(["setArenaWidth", "gameLoopConstructed"]);
+    });
+
+    it("Restart reuses the size the player picked on Play, not the default", () => {
+      const { menu, renderer, gameOver } = setup();
+      menu.firePlay(2000);
+      gameLoopInstances[0]!.callbacks.onPlayerEaten?.();
+      (renderer.setArenaWidth as ReturnType<typeof vi.fn>).mockClear();
+
+      gameOver.fireRestart();
+
+      expect(renderer.setArenaWidth).toHaveBeenCalledWith(2000);
+      expect(gameLoopInstances[1]!.worldService.getSnapshot().arenaWidth).toBe(2000);
+    });
   });
 });

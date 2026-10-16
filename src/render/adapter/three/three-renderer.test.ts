@@ -39,6 +39,45 @@ describe("ThreeRenderer", () => {
     expect(() => renderer.dispose()).not.toThrow();
   });
 
+  it("setArenaWidth() disposes the old floor/rim and adds a new one sized to the new width", () => {
+    const renderer = new ThreeRenderer(1000);
+    const scene = (renderer as unknown as { scene: THREE.Scene }).scene;
+    const oldFloor = scene.getObjectByName("arena-floor") as THREE.Mesh;
+    const oldRim = scene.getObjectByName("arena-rim") as THREE.Mesh;
+    const oldFloorGeometryDispose = vi.spyOn(oldFloor.geometry, "dispose");
+    const oldFloorMaterialDispose = vi.spyOn(oldFloor.material as THREE.Material, "dispose");
+    const oldRimGeometryDispose = vi.spyOn(oldRim.geometry, "dispose");
+    const oldRimMaterialDispose = vi.spyOn(oldRim.material as THREE.Material, "dispose");
+
+    renderer.setArenaWidth(2000);
+
+    expect(oldFloorGeometryDispose).toHaveBeenCalledOnce();
+    expect(oldFloorMaterialDispose).toHaveBeenCalledOnce();
+    expect(oldRimGeometryDispose).toHaveBeenCalledOnce();
+    expect(oldRimMaterialDispose).toHaveBeenCalledOnce();
+
+    // Exactly one "arena-floor"/"arena-rim" pair in the scene afterward — the old meshes were
+    // removed, not merely disposed-in-place and left dangling in the scene graph.
+    const newFloor = scene.getObjectByName("arena-floor") as THREE.Mesh;
+    const newRim = scene.getObjectByName("arena-rim") as THREE.Mesh;
+    expect(newFloor).not.toBe(oldFloor);
+    expect(newRim).not.toBe(oldRim);
+    expect((newFloor.geometry as THREE.CircleGeometry).parameters.radius).toBe(1000);
+    expect((newRim.geometry as THREE.TorusGeometry).parameters.radius).toBe(1000);
+  });
+
+  it("setArenaWidth() leaves lighting and the entity-mesh group untouched", () => {
+    const renderer = new ThreeRenderer();
+    const scene = (renderer as unknown as { scene: THREE.Scene }).scene;
+    const childCountBefore = scene.children.length;
+    const lightsBefore = scene.children.filter((c) => c instanceof THREE.Light).length;
+
+    renderer.setArenaWidth(1500);
+
+    expect(scene.children.length).toBe(childCountBefore);
+    expect(scene.children.filter((c) => c instanceof THREE.Light).length).toBe(lightsBefore);
+  });
+
   it("dispose() releases the static floor/rim geometry and materials, not just the renderer", () => {
     // The floor/rim are built in the constructor (createScene), independent of init(), so
     // this can be verified without a real WebGL context — only THREE.WebGLRenderer.dispose()

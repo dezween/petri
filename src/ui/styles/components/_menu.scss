@@ -13,3 +13,38 @@
 #menu-screen .screen__instructions {
   color: var(--color-text-muted);
 }
+
+// Arena size picker (Epic 2, task 002) — a secondary control on the same screen, so it's kept
+// visually quieter than the primary Play button rather than competing with it.
+.size-picker {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.size-picker__button {
+  appearance: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.size-picker__button--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+
+  &:hover {
+    background: var(--color-accent-hover);
+  }
+}

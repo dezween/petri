@@ -14,7 +14,11 @@ import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
  */
 export interface BootstrapElements {
   canvasContainer: HTMLElement;
-  menu: { root: HTMLElement; playButton: HTMLButtonElement };
+  menu: {
+    root: HTMLElement;
+    playButton: HTMLButtonElement;
+    sizeButtons: { small: HTMLButtonElement; medium: HTMLButtonElement; large: HTMLButtonElement };
+  };
   hud: { root: HTMLElement; massValue: HTMLElement };
   gameOver: {
     root: HTMLElement;
@@ -55,7 +59,7 @@ export function bootstrap(
 
   const inputSource = new MouseInputAdapter(elements.canvasContainer);
 
-  const menu = new MenuAdapter(elements.menu.root, elements.menu.playButton);
+  const menu = new MenuAdapter(elements.menu.root, elements.menu.playButton, elements.menu.sizeButtons);
   const hud = new HudAdapter(elements.hud.root, elements.hud.massValue);
   const gameOver = new GameOverAdapter(
     elements.gameOver.root,

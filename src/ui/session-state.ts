@@ -9,11 +9,11 @@ import type { IHud } from "./port/hud.port";
 
 export type SessionStateName = "MainMenu" | "Playing" | "GameOver" | "Victory";
 
-/** Port for the MainMenu screen (task 019). No dedicated port file — contract is small enough to live alongside the state machine that's its only consumer. */
+/** Port for the MainMenu screen (task 019). No dedicated port file — contract is small enough to live alongside the state machine that's its only consumer. The handler receives the arena width the player picked (Epic 2, task 001/002) — one of 1000/1500/2000. */
 export interface MenuScreen {
   show(): void;
   hide(): void;
-  onPlay(handler: () => void): void;
+  onPlay(handler: (arenaWidth: number) => void): void;
 }
 
 /** Port for the live HUD overlay (task 020) — adds show/hide to the IHud data contract. */
@@ -56,10 +56,17 @@ export interface SessionStateDeps {
 export class SessionState {
   private current: SessionStateName = "MainMenu";
   private gameLoop: GameLoopService | null = null;
+  /** The arena width used for the game currently in progress (or about to start). Updated
+   * whenever Play is invoked with an explicit choice (i.e. from the menu); Restart reuses
+   * whatever this already is rather than resetting to the default, since Restart doesn't go
+   * through the menu and has no new choice to offer. */
+  private selectedArenaWidth: number;
 
   constructor(private readonly deps: SessionStateDeps) {
+    this.selectedArenaWidth = deps.arenaWidth ?? DEFAULT_ARENA_WIDTH;
+
     const { menu, gameOver, victory } = deps.screens;
-    menu.onPlay(() => this.play());
+    menu.onPlay((arenaWidth) => this.play(arenaWidth));
     gameOver.onRestart(() => this.play());
     gameOver.onMainMenu(() => this.returnToMainMenu());
     victory.onRestart(() => this.play());
@@ -72,13 +79,20 @@ export class SessionState {
     return this.current;
   }
 
-  private play(): void {
+  /** `arenaWidth` is the menu's choice on a real Play click; omitted on Restart, which reuses
+   * `selectedArenaWidth` as last set. */
+  private play(arenaWidth?: number): void {
     // Defensive state guard: the only thing normally preventing e.g. a second Play click
     // while already Playing is the menu screen's `hidden` DOM attribute — and this exact
     // codebase has already shipped one real bug where `[hidden]` was overridden by CSS,
     // letting a "hidden" element still intercept events. Don't rely on DOM enforcement alone.
     if (this.current === "Playing") return;
+    if (arenaWidth !== undefined) this.selectedArenaWidth = arenaWidth;
     this.stopLoop();
+    // Keeps the renderer's drawn arena in sync with the world's collision bounds — see
+    // IRenderer.setArenaWidth's doc comment for why this can't just be "pass it to the
+    // constructor" the way WorldService's arenaWidth can.
+    this.deps.renderer.setArenaWidth(this.selectedArenaWidth);
     this.gameLoop = this.createFreshGameLoop();
     this.current = "Playing";
     this.showOnly("Playing");
@@ -116,7 +130,7 @@ export class SessionState {
 
   /** Builds a brand-new world end to end — new player, fresh bot/food population — so Restart never continues stale state. */
   private createFreshGameLoop(): GameLoopService {
-    const arenaWidth = this.deps.arenaWidth ?? DEFAULT_ARENA_WIDTH;
+    const arenaWidth = this.selectedArenaWidth;
     const player = createPlayer("player", { x: 0, z: 0 });
 
     const populationService = new BotPopulationService();

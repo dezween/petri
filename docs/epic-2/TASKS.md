@@ -5,8 +5,8 @@ numbering namespace from Epic 1 (restarts at 001). See `docs/epic-2/SPEC.md` for
 design decisions and Out of Scope list these tasks implement. Nothing here is implemented yet —
 this is planning only.
 
-- [ ] [001 — Arena size parameter threading](tasks/001-arena-size-parameter-threading.md)
-- [ ] [002 — Main menu size-picker UI](tasks/002-main-menu-size-picker.md)
+- [x] [001 — Arena size parameter threading](tasks/001-arena-size-parameter-threading.md)
+- [x] [002 — Main menu size-picker UI](tasks/002-main-menu-size-picker.md)
 - [ ] [003 — Audio Port + Adapter](tasks/003-audio-port-and-adapter.md)
 - [ ] [004 — Sound effects wired to game events](tasks/004-sound-effects-wiring.md)
 - [ ] [005 — Background Ambient / Music Loop](tasks/005-background-music-loop.md)

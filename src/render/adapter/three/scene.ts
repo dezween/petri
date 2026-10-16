@@ -17,6 +17,20 @@ export function createScene(arenaWidth: number): THREE.Scene {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xe8f0ee);
 
+  const { floor, rim } = buildArenaFloorAndRim(arenaWidth);
+  scene.add(floor);
+  scene.add(rim);
+
+  return scene;
+}
+
+/**
+ * The `arenaWidth`-dependent part of `createScene`, factored out so `ThreeRenderer.setArenaWidth`
+ * (task 001, Epic 2) can rebuild just the floor/rim in place on an already-live scene — without
+ * reconstructing the whole `THREE.Scene` and losing the lighting/entity-mesh group already added
+ * to it.
+ */
+export function buildArenaFloorAndRim(arenaWidth: number): { floor: THREE.Mesh; rim: THREE.Mesh } {
   const arenaRadius = arenaWidth / 2;
 
   const floorGeometry = new THREE.CircleGeometry(arenaRadius, 64);
@@ -30,7 +44,6 @@ export function createScene(arenaWidth: number): THREE.Scene {
   // codebase's Vector2 ({x, z}) assumes.
   floor.rotation.x = -Math.PI / 2;
   floor.name = "arena-floor";
-  scene.add(floor);
 
   const rimTubeRadius = arenaRadius * RIM_TUBE_RADIUS_FRACTION;
   const rimGeometry = new THREE.TorusGeometry(arenaRadius, rimTubeRadius, 16, 96);
@@ -45,7 +58,6 @@ export function createScene(arenaWidth: number): THREE.Scene {
   // TorusGeometry lies flat in XY by default too; same rotation as the floor.
   rim.rotation.x = -Math.PI / 2;
   rim.name = "arena-rim";
-  scene.add(rim);
 
-  return scene;
+  return { floor, rim };
 }

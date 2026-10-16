@@ -60,6 +60,7 @@ function createFakeRenderer(): IRenderer {
     init: vi.fn(),
     render: vi.fn(),
     resize: vi.fn(),
+    setArenaWidth: vi.fn(),
     dispose: vi.fn(),
   };
 }
