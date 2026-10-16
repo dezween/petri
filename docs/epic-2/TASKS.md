@@ -20,5 +20,5 @@ this is planning only.
 - [x] [013 — Depth-of-field / blur post-processing](tasks/013-depth-of-field-postprocessing.md)
 - [x] [014 — Bloom post-processing](tasks/014-bloom-postprocessing.md)
 - [x] [015 — Accessible bot color palette](tasks/015-accessible-bot-palette.md)
-- [ ] [016 — Epic 2 playtest & balance pass](tasks/016-playtest-balance-pass.md)
-- [ ] [017 — Update README for Epic 2](tasks/017-readme-update.md)
+- [x] [016 — Epic 2 playtest & balance pass](tasks/016-playtest-balance-pass.md)
+- [x] [017 — Update README for Epic 2](tasks/017-readme-update.md)
