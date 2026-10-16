@@ -217,6 +217,55 @@ describe("WorldService.tick — collisions", () => {
     expect(snapshot.bots).toHaveLength(1);
     expect(snapshot.bots[0]!.radius).toBeLessThanOrEqual(cap);
   });
+
+  it("does not tunnel two closing near-minimum-mass bots through each other during a stalled frame (WR-03 regression)", () => {
+    // The one realistic pairing in this game's actual numbers where a single end-of-tick
+    // position check can miss a collision: two bots near INITIAL_BOT_MASS (5, the smallest
+    // mass any live bot has) closing head-on. Each has speed BOT_BASE_SPEED / sqrt(5) ≈ 447.2
+    // units/sec, so closing speed ≈ 894.4 units/sec; combined radius
+    // massToRadius(5) * 2 ≈ 35.8. Starting 45 units apart (just outside combined radius) and
+    // ticking once at MAX_DELTA_TIME (0.1s, the worst a real stall is ever simulated as): a
+    // single un-split 0.1s move would send each bot its own full 44.7-unit distance toward the
+    // other, ending ~44.4 units apart on the *opposite* sides from where they started — still
+    // outside combined radius, a clean miss, despite having swapped positions and so
+    // necessarily crossed paths somewhere in between. Substepping (this file's
+    // MAX_SUBSTEP_DELTA_TIME) must catch the crossing instead.
+    //
+    // `hunter` chases `prey` directly (prey's mass is a hair under hunter's, to satisfy
+    // resolveEating's strict "<" prey filter while staying numerically indistinguishable from
+    // the real worst case of two equal-mass-5 bots). `prey` is a plain wanderer pulled toward
+    // `lure`, a food pellet placed beyond `hunter`'s position — its direction is therefore
+    // straight at (and through) `hunter`, giving a true head-on closing pair without either
+    // bot's direction depending on the other.
+    const hunterMass = 5;
+    const preyMass = 4.999;
+    const hunter = makeBot({
+      id: "hunter",
+      mass: hunterMass,
+      radius: massToRadius(hunterMass),
+      behavior: "hunter",
+      position: { x: -22.5, z: 0 },
+    });
+    const prey = makeBot({
+      id: "prey",
+      mass: preyMass,
+      radius: massToRadius(preyMass),
+      behavior: "wanderer",
+      position: { x: 22.5, z: 0 },
+    });
+    const lure = makeFood({ id: "lure", position: { x: -120, z: 0 } });
+    const player = makePlayer({ position: { x: 5000, z: 5000 } }); // far away, uninvolved
+    const world = new WorldService(player, [hunter, prey], [lure]);
+
+    world.tick(0.1, { x: 0, z: 0 });
+
+    const snapshot = world.getSnapshot();
+    // `prey` must have actually been caught (eaten by `hunter`), not passed through
+    // undetected — the direct symptom of the tunneling bug this substep fix addresses.
+    expect(snapshot.bots.map((bot) => bot.id)).not.toContain("prey");
+    expect(snapshot.bots).toHaveLength(1);
+    expect(snapshot.bots[0]!.id).toBe("hunter");
+  });
 });
 
 describe("WorldService.tick — eaten events", () => {

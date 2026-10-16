@@ -32,6 +32,34 @@ const BASE_SPEED = 1200;
  * BASE_SPEED as before the speed-up, so an equal-mass chase is still survivable. */
 const BOT_BASE_SPEED = 1000;
 
+/**
+ * Any single physics (sub)step's deltaTime is capped to this, so `tick()` splits a longer
+ * deltaTime into multiple smaller steps rather than moving everything the full distance in one
+ * end-of-step-position-only collision check. `GameLoopService`'s `MAX_DELTA_TIME` (0.1s) bounds
+ * the *worst case* a single call to `tick()` will ever simulate, but does not bound it to
+ * anything smaller than an entity's own size — `resolveCollisions()` has no swept/continuous
+ * check, so a step whose displacement is too large relative to the entities involved can let
+ * one pass clean through another (a missed eat, or a missed death) without their positions
+ * ever overlapping at a checked instant.
+ *
+ * Worked out from the real numbers (not guessed): the riskiest realistic pairing is two
+ * freshly-spawned bots (`INITIAL_BOT_MASS = 5` each, the smallest mass any live bot ever has,
+ * since bots only grow) moving directly at each other. Each has speed
+ * `BOT_BASE_SPEED / sqrt(5) ≈ 447.2` units/sec, so their closing speed head-on is
+ * `≈ 894.4` units/sec; their combined radius is `massToRadius(5) * 2 ≈ 35.8` units. At this
+ * cap, their worst-case closing displacement in one substep is `894.4 * 0.02 ≈ 17.9` units —
+ * about half their combined radius, a comfortable margin. (A fast bot vs. a stationary food
+ * pellet — the smallest entity, `massToRadius(FOOD_MASS) = 8`, since `FOOD_MASS = 1` — is an
+ * even looser case: combined radius `≈ 25.9` vs. a one-sided worst-case displacement of
+ * `447.2 * 0.02 ≈ 8.9`.) Chosen over tightening `MAX_DELTA_TIME` itself: bounding *that*
+ * tightly enough on its own (≈0.036s, using the same bot-vs-bot numbers) would clamp — and
+ * visibly slow down — plenty of ordinary frames well above 30fps, not just real stalls.
+ * Substepping only adds extra work during an actual stall: at `MAX_DELTA_TIME`'s 0.1s cap, a
+ * stalled tick needs at most `Math.ceil(0.1 / 0.02) = 5` substeps; at a normal 60fps frame
+ * (deltaTime ≈ 0.0167s), it needs only 1 — no added per-frame cost under normal play.
+ */
+const MAX_SUBSTEP_DELTA_TIME = 0.02;
+
 export interface WorldSnapshot {
   player: Player;
   bots: Bot[];
@@ -87,13 +115,30 @@ export class WorldService {
   }
 
   tick(deltaTime: number, playerInputDirection: Vector2): TickResult {
-    this.movePlayer(deltaTime, playerInputDirection);
-    this.moveBots(deltaTime);
+    // Split into substeps bounded by MAX_SUBSTEP_DELTA_TIME (see its comment for the real
+    // numbers behind this) so a long deltaTime (a frame stall, up to GameLoopService's
+    // MAX_DELTA_TIME clamp) can't move anything far enough in one end-of-step collision check
+    // to tunnel through another entity. A normal frame's deltaTime is already well under this
+    // cap, so `substeps` is 1 and this is a no-op most of the time.
+    const substeps = Math.max(1, Math.ceil(deltaTime / MAX_SUBSTEP_DELTA_TIME));
+    const substepDelta = deltaTime / substeps;
+    const eatenEvents: EatenEvent[] = [];
+    let playerEaten = false;
 
-    this.clampToArena(this.player);
-    for (const bot of this.bots) this.clampToArena(bot);
+    for (let i = 0; i < substeps; i++) {
+      this.movePlayer(substepDelta, playerInputDirection);
+      this.moveBots(substepDelta);
 
-    const { playerEaten, eatenEvents } = this.resolveCollisions();
+      this.clampToArena(this.player);
+      for (const bot of this.bots) this.clampToArena(bot);
+
+      const stepResult = this.resolveCollisions();
+      eatenEvents.push(...stepResult.eatenEvents);
+      if (stepResult.playerEaten) {
+        playerEaten = true;
+        break;
+      }
+    }
 
     this.player.radius = clampRadiusToCap(
       massToRadius(this.player.mass),
