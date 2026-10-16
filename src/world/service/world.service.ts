@@ -21,16 +21,16 @@ export const DEFAULT_ARENA_WIDTH = 1000;
 
 /**
  * Tunable: base player movement speed (units/sec) at mass=1. Raised 20x (120 -> 2400) after a
- * real player reported the original value made the game feel like "watching a cartoon" —
- * verified by measuring actual on-screen crossing time via Playwright (see the commit this
- * comment shipped in): at the original value, crossing the starting-zoom viewport took ~50s;
- * this value targets ~2.5s, closer to the brisk feel of the original agar.io.
+ * real player reported the original value made the game feel like "watching a cartoon" (see
+ * the commit that shipped that change for the measured before/after crossing-time numbers),
+ * then halved again (2400 -> 1200) after the same player found 2400 too fast in real play.
+ * Net ~10x over the original.
  */
-const BASE_SPEED = 2400;
+const BASE_SPEED = 1200;
 
 /** Tunable: base bot movement speed (units/sec) at mass=1 — kept at the same ~83% ratio to
  * BASE_SPEED as before the speed-up, so an equal-mass chase is still survivable. */
-const BOT_BASE_SPEED = 2000;
+const BOT_BASE_SPEED = 1000;
 
 export interface WorldSnapshot {
   player: Player;
