@@ -35,9 +35,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # `--clobber` is a `gh release upload` flag, not a `gh release create` one — passing
+          # it here fails with "unknown flag" every time. Idempotency for a re-run against the
+          # same tag is achieved by deleting any existing release for it first instead.
+          gh release delete "${GITHUB_REF_NAME}" --yes || true
           gh release create "${GITHUB_REF_NAME}" \
             "petri-${GITHUB_REF_NAME}.zip" \
             "petri-${GITHUB_REF_NAME}.tar.gz" \
             --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
-            --clobber
+            --generate-notes
