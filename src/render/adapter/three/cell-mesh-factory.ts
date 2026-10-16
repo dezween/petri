@@ -172,15 +172,49 @@ const IDENTITY_QUATERNION = new THREE.Quaternion();
  */
 const GROUND_ELEVATION_FRACTION = 0.4;
 
+/**
+ * Epic 3, task 004: small continuous Y-oscillation on top of `GROUND_ELEVATION_FRACTION`'s fixed
+ * base height, so entities read as floating/buoyant rather than rigidly fixed to one plane.
+ * Amplitude/frequency are SPEC.md's Design Decision 4 starting values (2-4 world units,
+ * 0.5-1 Hz) — tuned for real in task 006's balance pass, like every other new-in-Epic-3 visual
+ * constant, hence the generous comment rather than a bare magic number.
+ */
+const BOB_AMPLITUDE = 3;
+const BOB_FREQUENCY_HZ = 0.75;
+const BOB_ANGULAR_FREQUENCY = 2 * Math.PI * BOB_FREQUENCY_HZ;
+
+/** Pure sine-wave Y-offset for a given running clock and per-entity phase — kept standalone
+ * (not inlined into `composeAt`) so it's directly unit-testable without a `THREE.Matrix4`. */
+export function computeBobOffset(elapsedTime: number, phaseOffset: number): number {
+  return BOB_AMPLITUDE * Math.sin(BOB_ANGULAR_FREQUENCY * elapsedTime + phaseOffset);
+}
+
+/**
+ * Derives a stable, well-spread phase offset in `[0, 2π)` from an entity's `id` string — the
+ * only approach actually grounded in existing domain data (see task 004's doc for why a
+ * "spawn position" alternative was considered and dropped: nothing tracks that over time).
+ * A simple multiplicative string hash is enough here; this isn't security- or
+ * collision-sensitive, it only needs "different enough ids don't look like they're bobbing in
+ * lockstep", not cryptographic uniformity.
+ */
+export function phaseOffsetForId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (Math.imul(hash, 31) + id.charCodeAt(i)) | 0;
+  }
+  return (Math.abs(hash) % 1000) / 1000 * (Math.PI * 2);
+}
+
 function composeAt(
   matrix: THREE.Matrix4,
   x: number,
   z: number,
   scale: number,
   radius: number,
+  bobY: number,
 ): THREE.Matrix4 {
   return matrix.compose(
-    new THREE.Vector3(x, radius * GROUND_ELEVATION_FRACTION, z),
+    new THREE.Vector3(x, radius * GROUND_ELEVATION_FRACTION + bobY, z),
     IDENTITY_QUATERNION,
     new THREE.Vector3(scale, scale, scale),
   );
@@ -201,6 +235,12 @@ export class CellMeshFactory {
   private readonly playerMesh?: THREE.Object3D;
   private readonly foodMesh?: THREE.InstancedMesh;
   private readonly botMeshes: Partial<Record<BotBehavior, THREE.InstancedMesh>> = {};
+  /** Epic 3, task 004: running clock accumulated from each frame's `deltaTime` (the same
+   * "receive raw deltaTime, own the accumulation internally" shape `ParticleSystem.update`
+   * already established), driving the bobbing sine wave. Not reset on anything — a continuous
+   * ever-increasing clock is simpler than a wrapped one and `Math.sin` doesn't care how large
+   * its input gets. */
+  private elapsedTime = 0;
 
   constructor(models: ModelCache) {
     if (models.player_cell) {
@@ -239,7 +279,8 @@ export class CellMeshFactory {
     return mesh;
   }
 
-  updateFromSnapshot(snapshot: WorldSnapshot): void {
+  updateFromSnapshot(snapshot: WorldSnapshot, deltaTime: number): void {
+    this.elapsedTime += deltaTime;
     this.updatePlayer(snapshot.player);
     this.updateFood(snapshot.food);
     this.updateBots(snapshot.bots);
@@ -247,9 +288,12 @@ export class CellMeshFactory {
 
   private updatePlayer(player: WorldSnapshot["player"]): void {
     if (!this.playerMesh) return; // player_cell model failed to load — nothing to update
+    // The player is singular — no phase variation needed (task 004's doc: phase offsets only
+    // matter for avoiding visibly-synchronized bobbing between multiple same-type entities).
+    const bobY = computeBobOffset(this.elapsedTime, 0);
     this.playerMesh.position.set(
       player.position.x,
-      player.radius * GROUND_ELEVATION_FRACTION,
+      player.radius * GROUND_ELEVATION_FRACTION + bobY,
       player.position.z,
     );
     const scale = radiusToScale(player.radius, "player_cell");
@@ -262,7 +306,8 @@ export class CellMeshFactory {
     const matrix = new THREE.Matrix4();
     for (let i = 0; i < count; i++) {
       const f = food[i];
-      composeAt(matrix, f.position.x, f.position.z, radiusToScale(f.radius, "food"), f.radius);
+      const bobY = computeBobOffset(this.elapsedTime, phaseOffsetForId(f.id));
+      composeAt(matrix, f.position.x, f.position.z, radiusToScale(f.radius, "food"), f.radius, bobY);
       this.foodMesh.setMatrixAt(i, matrix);
     }
     this.foodMesh.count = count;
@@ -283,7 +328,8 @@ export class CellMeshFactory {
 
       for (let i = 0; i < count; i++) {
         const bot = list[i];
-        composeAt(matrix, bot.position.x, bot.position.z, radiusToScale(bot.radius, model), bot.radius);
+        const bobY = computeBobOffset(this.elapsedTime, phaseOffsetForId(bot.id));
+        composeAt(matrix, bot.position.x, bot.position.z, radiusToScale(bot.radius, model), bot.radius, bobY);
         mesh.setMatrixAt(i, matrix);
       }
       mesh.count = count;

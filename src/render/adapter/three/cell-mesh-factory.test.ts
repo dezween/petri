@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CellMeshFactory, extractMesh, radiusToScale } from "./cell-mesh-factory";
+import { CellMeshFactory, computeBobOffset, extractMesh, phaseOffsetForId, radiusToScale } from "./cell-mesh-factory";
 import type { ModelCache, ModelName } from "./model-loader";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import type { Bot } from "@/world/domain/bot.entity";
@@ -42,6 +42,48 @@ function bot(id: string, behavior: Bot["behavior"], x: number, radius: number): 
   return { id, behavior, position: { x, z: 0 }, radius, mass: radius * radius };
 }
 
+describe("computeBobOffset", () => {
+  it("stays within the configured amplitude band", () => {
+    for (let t = 0; t < 10; t += 0.1) {
+      const offset = computeBobOffset(t, 0);
+      expect(Math.abs(offset)).toBeLessThanOrEqual(3 + 1e-9); // BOB_AMPLITUDE = 3
+    }
+  });
+
+  it("is zero at t=0 with a zero phase, and oscillates (not constant) over time", () => {
+    expect(computeBobOffset(0, 0)).toBeCloseTo(0);
+    const atZero = computeBobOffset(0, 0);
+    const later = computeBobOffset(0.3, 0);
+    expect(later).not.toBeCloseTo(atZero, 5);
+  });
+
+  it("a nonzero phase offset shifts the wave, producing a different value at the same t", () => {
+    const unphased = computeBobOffset(0.2, 0);
+    const phased = computeBobOffset(0.2, Math.PI / 2);
+    expect(phased).not.toBeCloseTo(unphased, 5);
+  });
+});
+
+describe("phaseOffsetForId", () => {
+  it("is stable for the same id across calls", () => {
+    expect(phaseOffsetForId("food-42")).toBe(phaseOffsetForId("food-42"));
+  });
+
+  it("gives different ids different phases (not every id collapsing to the same offset)", () => {
+    const phases = ["food-1", "food-2", "bot-1", "bot-2", "bot-3"].map(phaseOffsetForId);
+    const distinct = new Set(phases.map((p) => p.toFixed(6)));
+    expect(distinct.size).toBeGreaterThan(1);
+  });
+
+  it("always returns a value in [0, 2π)", () => {
+    for (const id of ["a", "food-1", "bot-999", ""]) {
+      const phase = phaseOffsetForId(id);
+      expect(phase).toBeGreaterThanOrEqual(0);
+      expect(phase).toBeLessThan(Math.PI * 2);
+    }
+  });
+});
+
 describe("radiusToScale", () => {
   it("divides world radius by the model's own base radius", () => {
     // food's Blender base radius is 0.25 (tools/blender/generate_food.py).
@@ -70,7 +112,7 @@ describe("CellMeshFactory", () => {
       arenaWidth: 1000,
     };
 
-    factory.updateFromSnapshot(snapshot);
+    factory.updateFromSnapshot(snapshot, 0);
 
     const playerMesh = factory.group.children.find(
       (c) => c instanceof THREE.Mesh,
@@ -95,7 +137,7 @@ describe("CellMeshFactory", () => {
       arenaWidth: 1000,
     };
 
-    factory.updateFromSnapshot(snapshot);
+    factory.updateFromSnapshot(snapshot, 0);
 
     const foodMesh = factory.group.children.find(
       (c) => c instanceof THREE.InstancedMesh,
@@ -113,7 +155,7 @@ describe("CellMeshFactory", () => {
       arenaWidth: 1000,
     };
 
-    factory.updateFromSnapshot(snapshot);
+    factory.updateFromSnapshot(snapshot, 0);
 
     const instancedMeshes = factory.group.children.filter(
       (c) => c instanceof THREE.InstancedMesh,
@@ -142,7 +184,7 @@ describe("CellMeshFactory", () => {
       food: [],
       arenaWidth: 1000,
     };
-    factory.updateFromSnapshot(snapshot);
+    factory.updateFromSnapshot(snapshot, 0);
 
     const playerObject = factory.group.children.find((c) => c instanceof THREE.Group) as THREE.Group;
     expect(playerObject).toBeInstanceOf(THREE.Group);
@@ -178,10 +220,12 @@ describe("CellMeshFactory", () => {
       arenaWidth: 1000,
     };
 
-    factory.updateFromSnapshot(snapshot);
+    factory.updateFromSnapshot(snapshot, 0);
 
     const playerMesh = factory.group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh;
     expect(playerMesh.position.y).toBeGreaterThan(0);
+    // Player has no bob phase offset (see computeBobOffset's player call site), and at
+    // elapsedTime=0 sin(0)=0 regardless — so this stays an exact check of the elevation alone.
     expect(playerMesh.position.y).toBeCloseTo(40 * 0.4);
 
     const matrix = new THREE.Matrix4();
@@ -191,7 +235,9 @@ describe("CellMeshFactory", () => {
     ) as THREE.InstancedMesh;
     hunterMesh.getMatrixAt(0, matrix);
     position.setFromMatrixPosition(matrix);
-    expect(position.y).toBeCloseTo(20 * 0.4);
+    // Bots DO get a per-id bob phase (Epic 3, task 004), so even at elapsedTime=0 the expected
+    // Y includes whatever that entity's bob offset is at t=0 — not just the bare elevation.
+    expect(position.y).toBeCloseTo(20 * 0.4 + computeBobOffset(0, phaseOffsetForId("b1")));
   });
 
   it("makes the player mesh, food, and every bot InstancedMesh cast shadows (Epic 3, task 003)", () => {
@@ -219,16 +265,67 @@ describe("CellMeshFactory", () => {
     }
   });
 
+  it("bobs the player mesh's Y position over time as accumulated deltaTime advances (Epic 3, task 004)", () => {
+    const factory = new CellMeshFactory(fakeModelCache());
+    const snapshot: WorldSnapshot = {
+      player: { id: "p1", position: { x: 0, z: 0 }, radius: 10, mass: 1 },
+      bots: [],
+      food: [],
+      arenaWidth: 1000,
+    };
+
+    factory.updateFromSnapshot(snapshot, 0);
+    const playerMesh = factory.group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh;
+    const yAtStart = playerMesh.position.y;
+
+    factory.updateFromSnapshot(snapshot, 0.3); // advance the internal elapsed-time clock
+    const yLater = playerMesh.position.y;
+
+    expect(yLater).not.toBeCloseTo(yAtStart, 5);
+  });
+
+  it("gives same-type bots different Y offsets at the same instant, so they don't bob in lockstep", () => {
+    const factory = new CellMeshFactory(fakeModelCache());
+    const snapshot: WorldSnapshot = {
+      player: { id: "p1", position: { x: 0, z: 0 }, radius: 10, mass: 1 },
+      bots: [bot("wanderer-a", "wanderer", 0, 10), bot("wanderer-b", "wanderer", 50, 10)],
+      food: [],
+      arenaWidth: 1000,
+    };
+
+    // A nonzero elapsedTime so a zero-phase entity wouldn't coincidentally also read as 0 here.
+    factory.updateFromSnapshot(snapshot, 1.23);
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const wandererMesh = factory.group.children.find(
+      (c) => c instanceof THREE.InstancedMesh && (c as THREE.InstancedMesh).count === 2,
+    ) as THREE.InstancedMesh;
+
+    wandererMesh.getMatrixAt(0, matrix);
+    position.setFromMatrixPosition(matrix);
+    const yA = position.y;
+
+    wandererMesh.getMatrixAt(1, matrix);
+    position.setFromMatrixPosition(matrix);
+    const yB = position.y;
+
+    expect(yA).not.toBeCloseTo(yB, 5);
+  });
+
   it("reuses the same InstancedMesh objects across calls instead of rebuilding them", () => {
     const factory = new CellMeshFactory(fakeModelCache());
     const before = factory.group.children.filter((c) => c instanceof THREE.InstancedMesh);
 
-    factory.updateFromSnapshot({
-      player: { id: "p1", position: { x: 0, z: 0 }, radius: 1, mass: 1 },
-      bots: [bot("b1", "wanderer", 0, 1)],
-      food: [],
-      arenaWidth: 1000,
-    });
+    factory.updateFromSnapshot(
+      {
+        player: { id: "p1", position: { x: 0, z: 0 }, radius: 1, mass: 1 },
+        bots: [bot("b1", "wanderer", 0, 1)],
+        food: [],
+        arenaWidth: 1000,
+      },
+      0,
+    );
     const after = factory.group.children.filter((c) => c instanceof THREE.InstancedMesh);
 
     expect(after).toEqual(before); // same object identities, not recreated
