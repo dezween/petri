@@ -9,9 +9,11 @@ fully opaque, there's no membrane concept to extend).
 
 ## Depends on / why it's next
 
-Independent of 001-004. Grouped last among the "feature" tasks (before the balance pass) since
-it's the most speculative/judgment-call-heavy of the five and benefits from the rest of the
-scene's new look (tilt, shadows, bobbing) already being in place to judge it against.
+Independent of 002-004; benefits from (and its acceptance criteria require) task 001's tilt
+already being in place to judge the grazing-angle effect. Grouped last among the "feature" tasks
+(before the balance pass) since it's the most speculative/judgment-call-heavy of the five and
+benefits from the rest of the scene's new look (tilt, shadows, bobbing) already being in place to
+judge it against.
 
 ## Detailed steps
 

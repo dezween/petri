@@ -137,10 +137,11 @@ actually looking at the result, not just trusting this math.
 - Starting frequency: **~0.5-1 Hz** (a slow, calm bob — this is a petri dish, not a trampoline).
 - **Per-entity phase offset is required**, not optional: if every entity bobs perfectly in sync
   it reads as one mechanical animation applied to a flat scene, defeating the point. Derive a
-  stable per-entity phase from something already unique per entity (e.g. a hash of the food/bot
-  array index, or — simpler and already available — each entity's world-space spawn position)
-  rather than `Math.random()` at render time, so a given entity's bob phase doesn't visibly jump
-  between frames.
+  stable per-entity phase by hashing the food/bot's stable `id` string (already unique and
+  available per entity; there's no tracked spawn-position in the domain layer — `position` is
+  mutated every tick — so that alternative isn't implementable without new state) rather than
+  `Math.random()` at render time, so a given entity's bob phase doesn't visibly jump between
+  frames.
 - This needs a running clock. `ThreeRenderer.render(snapshot, deltaTime)` already receives
   `deltaTime` every frame (added for Epic 2's particle system) — accumulate it into an elapsed-
   time value inside `CellMeshFactory` (or wherever the bobbing math lives) rather than adding a
