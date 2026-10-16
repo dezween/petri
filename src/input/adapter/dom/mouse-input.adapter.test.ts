@@ -14,14 +14,14 @@ describe("computeDirectionFromPointer", () => {
     expect(direction.x).toBeCloseTo(direction.z, 10);
   });
 
-  it("maps screen-right to world +x and screen-down to world +z", () => {
+  it("maps screen-right to world -x and screen-down to world -z (verified against the tilted camera's real THREE.js basis vectors — see this function's doc comment)", () => {
     const right = computeDirectionFromPointer(300, 50, rect); // straight right of center
-    expect(right.x).toBeCloseTo(1, 10);
+    expect(right.x).toBeCloseTo(-1, 10);
     expect(right.z).toBeCloseTo(0, 10);
 
     const down = computeDirectionFromPointer(100, 150, rect); // straight below center
     expect(down.x).toBeCloseTo(0, 10);
-    expect(down.z).toBeCloseTo(1, 10);
+    expect(down.z).toBeCloseTo(-1, 10);
   });
 });
 
@@ -63,7 +63,7 @@ describe("MouseInputAdapter", () => {
     container.fire("pointermove", { clientX: 200, clientY: 50 });
 
     const direction = adapter.getDirection();
-    expect(direction.x).toBeCloseTo(1, 10);
+    expect(direction.x).toBeCloseTo(-1, 10);
     expect(direction.z).toBeCloseTo(0, 10);
   });
 
