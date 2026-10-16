@@ -13,6 +13,11 @@ particle bursts on eating; a lab-bench background with decorative scenery around
 softly out-of-focus relative to the dish itself; a bloom pass for a glowing membrane/agar look;
 and a bot color palette chosen to stay distinguishable under red-green color blindness.
 
+Epic 3 adds: a tilted camera (67° elevation instead of straight down) for real parallax and
+depth instead of a flat top-down view; soft real-time shadows under every cell and prop; a
+gentle vertical bobbing float on food and bots; and a glassy fresnel rim-light on the player
+cell's membrane.
+
 ## Run it
 
 ```bash
@@ -66,6 +71,9 @@ and [`docs/epic-1/TASKS.md`](docs/epic-1/TASKS.md) for the numbered task breakdo
 build came from. [`docs/epic-2/SPEC.md`](docs/epic-2/SPEC.md) and
 [`docs/epic-2/TASKS.md`](docs/epic-2/TASKS.md) cover everything described above — arena sizes,
 audio, particles, background scenery, and visual polish — all shipped.
+[`docs/epic-3/SPEC.md`](docs/epic-3/SPEC.md) and [`docs/epic-3/TASKS.md`](docs/epic-3/TASKS.md)
+cover the tilted camera, shadows, bobbing, and fresnel membrane — visual-only, touching nothing
+outside `src/render/adapter/three/` and `tools/blender/`.
 
 ## Tests
 

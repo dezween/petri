@@ -3,8 +3,9 @@ import * as THREE from "three";
 /**
  * Epic 3, task 002: shadow-map resolution for the directional light below. 2048×2048 — large
  * enough to avoid obviously blocky edges on the mostly-empty pale floor, not so large it's a
- * measurable frame-time cost for a single directional light. Starting value, tuned for real in
- * task 006 if it turns out too soft/blocky/slow.
+ * measurable frame-time cost for a single directional light. Confirmed (not retuned) in task
+ * 006's playtest — real screenshots at all three arena sizes show soft, clean shadow edges with
+ * no visible acne/blockiness/peter-panning, and no observed stutter.
  */
 const SHADOW_MAP_SIZE = 2048;
 
