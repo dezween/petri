@@ -34,7 +34,8 @@ export interface BootstrapElements {
     root: HTMLElement;
     playButton: HTMLButtonElement;
     settingsButton: HTMLButtonElement;
-    sizeButtons: { small: HTMLButtonElement; medium: HTMLButtonElement; large: HTMLButtonElement };
+    /** One button per `MenuAdapter`'s `ARENA_SIZES` entry, same order, same length. */
+    sizeButtons: { buttons: HTMLButtonElement[] };
   };
   hud: { root: HTMLElement; massValue: HTMLElement };
   gameOver: {

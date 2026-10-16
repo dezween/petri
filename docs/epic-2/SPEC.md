@@ -66,17 +66,38 @@ src/
 
 ### 1. Arena size selection
 
-Three fixed sizes, chosen on the Main Menu before clicking Play:
+Originally shipped as three fixed sizes (Small/Medium/Large); **grown to ten on user request in
+a later pass**, keeping the original three's exact values on the new grid rather than
+renumbering anything already playtested:
 
-| Size | Arena width | Victory-cap mass (≈) | Relative to Small |
-|---|---|---|---|
-| Small | 1000 (existing `DEFAULT_ARENA_WIDTH`, unchanged) | ~2,200 | 1× (baseline, already balance-tuned in Epic 1) |
-| Medium | 1500 | ~4,950 | ~2.25× |
-| Large | 2000 | ~8,800 | ~4× |
+| Arena width | Victory-cap mass (≈) | Relative to 1000 |
+|---|---|---|
+| 1000 (`DEFAULT_ARENA_WIDTH`, unchanged — the original "Small") | ~2,200 | 1× (baseline, balance-tuned in Epic 1) |
+| 1250 | ~3,430 | ~1.56× |
+| 1500 (the original "Medium") | ~4,950 | ~2.25× |
+| 1750 | ~6,740 | ~3.06× |
+| 2000 (the original "Large") | ~8,800 | ~4× |
+| 2250 | ~11,140 | ~5.06× |
+| 2500 | ~13,730 | ~6.25× |
+| 2750 | ~16,610 | ~7.56× |
+| 3000 | ~19,770 | ~9× |
+| 3250 | ~23,210 | ~10.56× |
 
 Victory-cap mass scales with the **square** of arena width, because victory radius is a fixed
 fraction of arena width (`VICTORY_CAP_FRACTION = 0.375`, unchanged) and mass scales with
-radius². This is why Large isn't just "2× the game," it's closer to 4×.
+radius². This is why the top end isn't just "3.25× the game," it's over 10× — a deliberately
+conservative stopping point: a naive linear continuation of the original 500-unit Small→Large
+step (e.g. up toward 5000+) would have pushed the biggest size into the territory Epic 1's own
+balance pass (027) found unreachable-in-practice (hours, not minutes, of play). 3250 keeps the
+biggest option meaningfully longer than the original Large without crossing into that territory.
+Exact 10 values: `ARENA_SIZES` in `src/ui/adapter/dom/menu.adapter.ts` — 1000/1250/1500/1750/2000/2250/2500/2750/3000/3250, linear 250-unit steps.
+
+Growing past three sizes also meant fixing a latent bug in Epic 3's shadow mapping (task 002):
+its shadow-camera frustum and depth range were hardcoded for the then-fixed Large (2000) arena,
+not derived from whatever `arenaWidth` is actually in play. `lighting.ts`'s
+`configureShadowFrustum(light, arenaWidth)` now recomputes both from the light's real geometry
+for any arena width, called both at construction and from `ThreeRenderer.setArenaWidth` — see
+that function's doc comment for the depth-range derivation.
 
 `WorldService`, `BotPopulationService`, and `FoodSpawnerService` already accept `arenaWidth` as
 a constructor parameter and get freshly reconstructed with it on every Play/Restart (confirmed

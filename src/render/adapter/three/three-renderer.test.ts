@@ -86,16 +86,26 @@ describe("ThreeRenderer", () => {
     expect((newRim.geometry as THREE.TorusGeometry).parameters.radius).toBe(1000);
   });
 
-  it("setArenaWidth() leaves lighting and the entity-mesh group untouched", () => {
-    const renderer = new ThreeRenderer();
+  it("setArenaWidth() reuses the same light/camera/entity-mesh group (no scene-graph churn) but reconfigures the light's shadow frustum to match", () => {
+    const renderer = new ThreeRenderer(1000);
     const scene = (renderer as unknown as { scene: THREE.Scene }).scene;
+    const light = (renderer as unknown as { light: THREE.DirectionalLight }).light;
     const childCountBefore = scene.children.length;
     const lightsBefore = scene.children.filter((c) => c instanceof THREE.Light).length;
+    const frustumRightBefore = light.shadow.camera.right;
 
-    renderer.setArenaWidth(1500);
+    renderer.setArenaWidth(3250); // the largest of the 10 arena sizes
 
+    // No light was added/removed — setArenaWidth reconfigures the existing light in place.
     expect(scene.children.length).toBe(childCountBefore);
     expect(scene.children.filter((c) => c instanceof THREE.Light).length).toBe(lightsBefore);
+    expect(scene.children).toContain(light);
+
+    // But its shadow frustum DID widen to cover the new, much bigger arena — Epic 3's shadow
+    // mapping was originally hardcoded for one fixed arena size; this is the 10-size follow-up
+    // fix that makes it track whatever setArenaWidth is actually called with.
+    expect(light.shadow.camera.right).toBeGreaterThan(frustumRightBefore);
+    expect(light.shadow.camera.right).toBeGreaterThanOrEqual(1625); // arena radius at 3250
   });
 
   it("dispose() releases the static floor/rim geometry and materials, not just the renderer", () => {
