@@ -84,7 +84,7 @@ export class ThreeRenderer implements IRenderer {
 
   render(snapshot: WorldSnapshot, deltaTime: number): void {
     if (!this.renderer) return;
-    this.meshFactory?.updateFromSnapshot(snapshot);
+    this.meshFactory?.updateFromSnapshot(snapshot, deltaTime);
     this.particleSystem.update(deltaTime);
     adjustZoomForPlayerRadius(this.camera, snapshot.player.radius);
     updateCameraPosition(this.camera, snapshot.player.position);
