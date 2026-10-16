@@ -42,12 +42,20 @@ def main() -> None:
 
     combined = [p + nz for p, nz in zip(pad, noise)]
 
+    # Standard crossfade-loop: blend the head with the tail, then actually discard (trim) the
+    # tail region the blend drew from. Blending alone (without trimming) does NOT make a loop
+    # seamless for a non-periodic signal like this noise layer — it just replaces one
+    # uncorrelated discontinuity (old head vs. old tail) with another (new blended head vs. the
+    # still-untouched final sample), and empirically makes the seam discontinuity larger, not
+    # smaller, since fade_out is largest exactly where the written value is least related to the
+    # true original last sample. Trimming removes the duplicated tail so the blended region
+    # becomes the one and only seam.
     fade_n = int(CROSSFADE_SECONDS * SAMPLE_RATE)
-    for i in range(fade_n):
-        fade_in = i / fade_n
-        fade_out = 1.0 - fade_in
-        tail_idx = n - fade_n + i
-        combined[i] = combined[i] * fade_in + combined[tail_idx] * fade_out
+    blended_head = [
+        combined[i] * (i / fade_n) + combined[n - fade_n + i] * (1.0 - i / fade_n)
+        for i in range(fade_n)
+    ]
+    combined = blended_head + combined[fade_n : n - fade_n]
 
     peak = max((abs(x) for x in combined), default=1.0) or 1.0
     combined = [x / peak * 0.7 for x in combined]
