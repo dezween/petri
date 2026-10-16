@@ -114,15 +114,25 @@ export function extractMeshes(model: THREE.Object3D): ExtractedModel[] {
  * correct material, and a single transform (position/rotation/scale) applied to the returned
  * `Object3D` moves every part together as one rigid unit — see `disposeObject3D` for the
  * matching cleanup.
+ *
+ * Epic 3, task 003: every produced `Mesh` gets `castShadow = true` here (not on the returned
+ * `Group` itself — `Object3D.castShadow` has no rendering effect on a `Group`, Three.js only
+ * checks it on actual `Mesh` objects, so a multi-primitive model needs every child flagged
+ * individually). Both of this function's callers (player, static props) want shadow-casting, so
+ * setting it centrally here avoids duplicating the Group-vs-Mesh traversal at each call site.
  */
 export function buildStaticObject(model: THREE.Object3D): THREE.Object3D {
   const parts = extractMeshes(model);
   if (parts.length === 1) {
-    return new THREE.Mesh(parts[0].geometry, parts[0].material);
+    const mesh = new THREE.Mesh(parts[0].geometry, parts[0].material);
+    mesh.castShadow = true;
+    return mesh;
   }
   const group = new THREE.Group();
   for (const part of parts) {
-    group.add(new THREE.Mesh(part.geometry, part.material));
+    const mesh = new THREE.Mesh(part.geometry, part.material);
+    mesh.castShadow = true;
+    group.add(mesh);
   }
   return group;
 }
@@ -183,6 +193,10 @@ export class CellMeshFactory {
       const food = extractMesh(models.food);
       this.foodMesh = new THREE.InstancedMesh(food.geometry, food.material, MAX_FOOD_INSTANCES);
       this.foodMesh.count = 0;
+      // Epic 3, task 003: InstancedMesh shadow-casting is native Three.js behavior — each
+      // instance casts its own shadow using its own per-instance matrix from setMatrixAt, no
+      // per-instance flag needed, just this one static flag on the InstancedMesh itself.
+      this.foodMesh.castShadow = true;
       this.group.add(this.foodMesh);
     }
 
@@ -201,6 +215,8 @@ export class CellMeshFactory {
     const { geometry, material } = extractMesh(model);
     const mesh = new THREE.InstancedMesh(geometry, material, MAX_BOTS_PER_BEHAVIOR);
     mesh.count = 0;
+    // Epic 3, task 003 — see the food InstancedMesh's identical comment above.
+    mesh.castShadow = true;
     return mesh;
   }
 

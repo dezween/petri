@@ -95,6 +95,26 @@ describe("buildStaticProps", () => {
     expect(placed.scale.x).toBeCloseTo(90);
   });
 
+  it("makes every placed prop mesh cast shadows, including multi-primitive ones (Epic 3, task 003)", () => {
+    const models: ModelCache = {
+      prop_empty_dish: fakeMultiMeshModel(),
+      prop_pipette: fakeModel(),
+      prop_droplet: fakeModel(),
+    };
+
+    const group = buildStaticProps(models);
+
+    for (const placed of group.children) {
+      if (placed instanceof THREE.Mesh) {
+        expect(placed.castShadow).toBe(true);
+      } else {
+        for (const child of (placed as THREE.Group).children) {
+          expect((child as THREE.Mesh).castShadow).toBe(true);
+        }
+      }
+    }
+  });
+
   it("never mutates the input ModelCache or its model objects", () => {
     const model = fakeModel();
     const models: ModelCache = { prop_droplet: model };

@@ -163,6 +163,31 @@ describe("CellMeshFactory", () => {
     expect(() => extractMesh(fakeMultiMeshModel())).toThrow(/2 meshes/);
   });
 
+  it("makes the player mesh, food, and every bot InstancedMesh cast shadows (Epic 3, task 003)", () => {
+    const factory = new CellMeshFactory(fakeModelCache());
+
+    const playerMesh = factory.group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(playerMesh.castShadow).toBe(true);
+
+    const instancedMeshes = factory.group.children.filter(
+      (c) => c instanceof THREE.InstancedMesh,
+    ) as THREE.InstancedMesh[];
+    expect(instancedMeshes).toHaveLength(4); // food + 3 bot behaviors
+    for (const mesh of instancedMeshes) expect(mesh.castShadow).toBe(true);
+  });
+
+  it("casts shadows from every child mesh when the player model has more than one primitive", () => {
+    const cache = fakeModelCache();
+    cache.player_cell = fakeMultiMeshModel();
+    const factory = new CellMeshFactory(cache);
+
+    const playerGroup = factory.group.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    expect(playerGroup.children).toHaveLength(2);
+    for (const child of playerGroup.children) {
+      expect((child as THREE.Mesh).castShadow).toBe(true);
+    }
+  });
+
   it("reuses the same InstancedMesh objects across calls instead of rebuilding them", () => {
     const factory = new CellMeshFactory(fakeModelCache());
     const before = factory.group.children.filter((c) => c instanceof THREE.InstancedMesh);
