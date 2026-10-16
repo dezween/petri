@@ -23,4 +23,26 @@ describe("createScene", () => {
 
     expect(geometry.parameters.radius).toBeCloseTo(500);
   });
+
+  it("adds a lab-bench plane large enough to stay beneath the camera at the largest arena + max zoom-out", () => {
+    const scene = createScene(2000);
+    const bench = scene.getObjectByName("lab-bench") as THREE.Mesh;
+    const geometry = bench.geometry as THREE.CircleGeometry;
+
+    expect(bench).toBeInstanceOf(THREE.Mesh);
+    expect(bench.rotation.x).toBeCloseTo(-Math.PI / 2);
+    // Worst-case required coverage from world origin is ~4200 (see scene.ts's BENCH_RADIUS
+    // comment for the derivation) — assert comfortable headroom above that, not an exact value,
+    // so this doesn't become a brittle pin on the precise constant.
+    expect(geometry.parameters.radius).toBeGreaterThan(4200);
+  });
+
+  it("sizes the lab-bench the same regardless of arena width, unlike the floor/rim", () => {
+    const small = createScene(1000);
+    const large = createScene(2000);
+    const smallBench = (small.getObjectByName("lab-bench") as THREE.Mesh).geometry as THREE.CircleGeometry;
+    const largeBench = (large.getObjectByName("lab-bench") as THREE.Mesh).geometry as THREE.CircleGeometry;
+
+    expect(smallBench.parameters.radius).toBeCloseTo(largeBench.parameters.radius);
+  });
 });
