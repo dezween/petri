@@ -5,6 +5,41 @@ import type { Vector2 } from "@/world/domain/geometry";
 const CAMERA_HEIGHT = 500;
 
 /**
+ * Epic 3, task 001: elevation of the camera's look direction from horizontal. 90° would be the
+ * old perfectly-top-down view; this tilts it so the scene reads as 3D (parallax, visible object
+ * sides, angled shadows) without switching to a `PerspectiveCamera` — see
+ * docs/epic-3/SPEC.md's Design Decision 1 for why tilting the existing `OrthographicCamera` was
+ * chosen over a perspective switch. Starting value, not final — task 006's balance pass tunes it
+ * by eye.
+ */
+const CAMERA_ELEVATION_DEGREES = 67;
+
+/**
+ * Horizontal offset (world -Z, i.e. "south" of whatever the camera is looking at) that produces
+ * `CAMERA_ELEVATION_DEGREES` of elevation at `CAMERA_HEIGHT`: for a right triangle with the
+ * camera at the top, `tan(elevation) = height / offset`, so `offset = height / tan(elevation)`.
+ * At 67° this is `500 / tan(67°) ≈ 212`.
+ */
+const CAMERA_TILT_OFFSET = CAMERA_HEIGHT / Math.tan((CAMERA_ELEVATION_DEGREES * Math.PI) / 180);
+
+/**
+ * Near/far clipping planes along the camera's view direction. Under the old straight-down view
+ * every ground-plane point was at the same depth (exactly `CAMERA_HEIGHT`), so a tight [1, 1000]
+ * range was safe. Tilted, depth now varies with how far a point is "north" or "south" of the
+ * look-at target: for a ground point offset by `dz` along world Z, depth ≈
+ * `CAMERA_TILT_OFFSET*sin(elevation) + dz*cos(elevation)` (the forward vector's Y/Z components
+ * scaled by the (height, offset) right triangle) — at 67° that's roughly `460 + 0.39*dz`.
+ * Anything within the arena (radius ≤ 1000) stays within depth ≈ [70, 850], comfortably inside
+ * a generous symmetric range; the lab-bench (radius 6000) extends further but, per its own doc
+ * comment, is sized to always extend past the visible frustum anyway, so this only needs to
+ * cover what the frustum's own top/bottom/left/right can actually show, not the bench's full
+ * extent. [-1500, 3500] is generous relative to the arena's real depth range with ample margin
+ * for the bench content that *is* actually visible at the frustum's edges.
+ */
+const CAMERA_NEAR = -1500;
+const CAMERA_FAR = 3500;
+
+/**
  * Balance pass (027): scaled alongside cell.entity.ts's RADIUS_PER_MASS_SQRT (currently 8,
  * i.e. 4x the original 2) so on-screen framing is unchanged — these three constants only
  * make sense relative to that one, not as absolute values.
@@ -17,9 +52,11 @@ const ZOOM_OUT_PER_RADIUS = 2.2 / 4;
 const MIN_VIEW_HALF_WIDTH = 400;
 
 /**
- * Orthographic top-down camera: no perspective distortion, which suits a flat arena viewed
- * straight down better than a perspective camera (avoids the up-vector singularity of looking
- * straight down a perspective lens, and keeps apparent entity size independent of screen position).
+ * Orthographic camera, tilted `CAMERA_ELEVATION_DEGREES` from horizontal (Epic 3, task 001 —
+ * was perfectly top-down through Epic 1/2). Staying orthographic (not switching to
+ * `PerspectiveCamera`) keeps apparent entity size independent of screen position, which
+ * zoom-by-mass (`adjustZoomForPlayerRadius`) depends on; see docs/epic-3/SPEC.md's Design
+ * Decision 1.
  */
 export function createCamera(aspect: number): THREE.OrthographicCamera {
   const camera = new THREE.OrthographicCamera(
@@ -27,29 +64,32 @@ export function createCamera(aspect: number): THREE.OrthographicCamera {
     BASE_VIEW_HALF_WIDTH * aspect,
     BASE_VIEW_HALF_WIDTH,
     -BASE_VIEW_HALF_WIDTH,
-    1,
-    CAMERA_HEIGHT * 2,
+    CAMERA_NEAR,
+    CAMERA_FAR,
   );
-  camera.position.set(0, CAMERA_HEIGHT, 0);
-  // Looking straight down -Y makes the default up vector (0,1,0) parallel to the view
-  // direction, which is degenerate for lookAt. Point "up" along -Z instead so screen-up
-  // stays a sensible, stable direction.
-  camera.up.set(0, 0, -1);
+  camera.position.set(0, CAMERA_HEIGHT, -CAMERA_TILT_OFFSET);
+  // The old straight-down view made the default up vector (0,1,0) parallel to the view
+  // direction, which is degenerate for lookAt — that's why this used to be forced to (0,0,-1).
+  // Once tilted, the view direction (toward the origin, down and forward) is no longer parallel
+  // to (0,1,0) (their cross product is nonzero — verified in camera.test.ts), so the default up
+  // vector works again and reads as the natural "up" on screen.
   camera.lookAt(0, 0, 0);
   return camera;
 }
 
 /**
- * Keeps the camera centered on the player's current position every frame. Without this the
- * camera stays fixed on the arena's world-space origin — the player sails off-screen the
- * moment they move away from the center, since the orthographic frustum (±150 units at
- * minimum zoom) is far smaller than the arena. This was missing end-to-end from the design
- * spec through task 012's own doc (which only ever specified "look at the arena center" +
+ * Keeps the camera centered on the player's current position every frame, at the same tilted
+ * offset `createCamera` establishes — the two must stay consistent with each other or the
+ * camera would jump between its initial pose and its first follow-update. Without tracking the
+ * player at all, the camera stays fixed on the arena's world-space origin — the player sails
+ * off-screen the moment they move away from the center, since the orthographic frustum (±150
+ * units at minimum zoom) is far smaller than the arena. This was missing end-to-end from the
+ * design spec through task 012's own doc (which only ever specified "look at the arena center" +
  * zoom-by-mass, never follow-by-position) — caught by an actual browser playtest, not by
  * code review, since nothing in the docs flagged it as absent.
  */
 export function updateCameraPosition(camera: THREE.OrthographicCamera, playerPosition: Vector2): void {
-  camera.position.set(playerPosition.x, CAMERA_HEIGHT, playerPosition.z);
+  camera.position.set(playerPosition.x, CAMERA_HEIGHT, playerPosition.z - CAMERA_TILT_OFFSET);
   camera.lookAt(playerPosition.x, 0, playerPosition.z);
 }
 
