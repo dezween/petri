@@ -129,6 +129,20 @@ describe("loadAudioSettings", () => {
   });
 });
 
+describe("saveAudioSettings", () => {
+  it("does not throw when storage.setItem throws (quota-exceeded/disabled localStorage)", () => {
+    const storage = {
+      setItem: vi.fn(() => {
+        throw new Error("QuotaExceededError");
+      }),
+    };
+
+    expect(() =>
+      saveAudioSettings(storage, { ...DEFAULT_AUDIO_SETTINGS }),
+    ).not.toThrow();
+  });
+});
+
 describe("applyAudioSettings", () => {
   it("pushes every field onto the given IAudioPlayer", () => {
     const audioPlayer = createFakeAudioPlayer();
@@ -199,6 +213,39 @@ describe("SettingsAdapter", () => {
     expect(audioPlayer.muteMusic).toHaveBeenCalledWith(true);
     const [, saved] = storage.setItem.mock.calls[0]!;
     expect(JSON.parse(saved as string).musicMuted).toBe(true);
+  });
+
+  it("still applies a live control change to the audio player even when storage.setItem throws (WR-02 regression)", () => {
+    const root = createFakeElement();
+    const backButton = createFakeButton();
+    const sfxVolume = createFakeInput();
+    const sfxMute = createFakeInput();
+    const musicVolume = createFakeInput();
+    const musicMute = createFakeInput();
+    const audioPlayer = createFakeAudioPlayer();
+    const throwingStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(() => {
+        throw new Error("QuotaExceededError");
+      }),
+    };
+    const controls = {
+      root,
+      backButton,
+      sfxVolume,
+      sfxMute,
+      musicVolume,
+      musicMute,
+    } as unknown as SettingsControls;
+    new SettingsAdapter(controls, audioPlayer, throwingStorage, {
+      ...DEFAULT_AUDIO_SETTINGS,
+    });
+
+    sfxVolume.value = "0.9";
+    expect(() => sfxVolume.fire("input")).not.toThrow();
+
+    expect(audioPlayer.setSfxVolume).toHaveBeenCalledWith(0.9);
+    expect(throwingStorage.setItem).toHaveBeenCalledTimes(1);
   });
 
   it("changing the music volume does not clobber a previously-changed SFX setting (settings are merged, not replaced)", () => {
