@@ -58,15 +58,44 @@ export interface ExtractedModel {
 
 /**
  * Pulls the single mesh's geometry/material out of a loaded (possibly nested) model scene.
- * Every `tools/blender/generate_*.py` script joins its multi-part models into one mesh with
- * multiple material slots before export (glTF preserves per-face material slots across a
- * join) specifically so there's exactly one `THREE.Mesh` per model here. Throws rather than
- * silently picking "the first mesh found" if that invariant is ever violated — a model with
- * N>1 unjoined meshes would otherwise have N-1 of them silently dropped with no warning (this
- * class of bug previously affected `player_cell.glb` before its Blender script joined its
- * membrane + nucleus objects; see cell-mesh-factory.test.ts for the regression test).
+ * Used only for the `InstancedMesh` paths (bots/food, see `createBotInstancedMesh`/the food
+ * branch in `CellMeshFactory`'s constructor) — `InstancedMesh` needs exactly one geometry +
+ * material, it can't represent a model split across multiple glTF primitives the way
+ * `buildStaticObject` (below) can for the non-instanced player/prop paths. Throws rather than
+ * silently picking "the first mesh found" if a bot/food model ever regresses to multiple
+ * primitives — a model with N>1 meshes would otherwise have N-1 of them silently dropped with
+ * no warning. None of the 5 bot/food models currently have more than one primitive (verified
+ * by inspecting their exported glTF JSON directly), so this strict behavior is intentional
+ * here, not a gap: if that ever changes, `InstancedMesh` support for it needs building, this
+ * throw is the signal that it's needed, not a bug to route around.
  */
 export function extractMesh(model: THREE.Object3D): ExtractedModel {
+  const meshes = extractMeshes(model);
+  if (meshes.length > 1) {
+    throw new Error(
+      `Model contains ${meshes.length} meshes; extractMesh only instances the first one — ` +
+        "join into a single mesh in Blender, or extend CellMeshFactory to support multi-mesh models.",
+    );
+  }
+  return meshes[0];
+}
+
+/**
+ * Pulls every mesh's geometry/material out of a loaded (possibly nested) model scene — one
+ * entry per glTF primitive. A glTF "mesh" with multiple primitives (e.g. because two parts use
+ * different materials, like `player_cell.glb`'s translucent membrane + opaque nucleus, joined
+ * into one Blender object but necessarily exported as 2 primitives since they don't share a
+ * material) does NOT import into Three.js as one `THREE.Mesh` with a material array — glTF's
+ * "primitive" and Three.js's "mesh+material-array+geometry-groups" are different mechanisms,
+ * and `GLTFLoader` creates one separate `THREE.Mesh` per primitive instead. This was wrongly
+ * assumed not to happen (see `extractMesh`'s git history) until an actual Playwright browser
+ * playtest (Epic 2, task 016) caught `CellMeshFactory`'s constructor throwing on startup for
+ * every multi-primitive model, silently aborting ALL entity+prop rendering, not just that one
+ * model's — static JSON inspection of the exported `.glb` (which only checks primitive *counts
+ * within* a mesh definition) can't catch this, only loading it through the real `GLTFLoader`
+ * does.
+ */
+export function extractMeshes(model: THREE.Object3D): ExtractedModel[] {
   const meshes: THREE.Mesh[] = [];
   model.traverse((child) => {
     if (child instanceof THREE.Mesh) meshes.push(child);
@@ -74,13 +103,43 @@ export function extractMesh(model: THREE.Object3D): ExtractedModel {
   if (meshes.length === 0) {
     throw new Error("Model contains no Mesh to instance");
   }
-  if (meshes.length > 1) {
-    throw new Error(
-      `Model contains ${meshes.length} meshes; extractMesh only instances the first one — ` +
-        "join into a single mesh in Blender, or extend CellMeshFactory to support multi-mesh models.",
-    );
+  return meshes.map((mesh) => ({ geometry: mesh.geometry, material: mesh.material }));
+}
+
+/**
+ * Builds a renderable `THREE.Object3D` for a non-instanced model (the player, and static props
+ * in `static-props.ts`) that tolerates more than one primitive: a single-primitive model
+ * becomes a plain `THREE.Mesh` (unchanged, fast path); a multi-primitive model becomes a
+ * `THREE.Group` containing one `THREE.Mesh` per primitive, so every part renders with its own
+ * correct material, and a single transform (position/rotation/scale) applied to the returned
+ * `Object3D` moves every part together as one rigid unit — see `disposeObject3D` for the
+ * matching cleanup.
+ */
+export function buildStaticObject(model: THREE.Object3D): THREE.Object3D {
+  const parts = extractMeshes(model);
+  if (parts.length === 1) {
+    return new THREE.Mesh(parts[0].geometry, parts[0].material);
   }
-  return { geometry: meshes[0].geometry, material: meshes[0].material };
+  const group = new THREE.Group();
+  for (const part of parts) {
+    group.add(new THREE.Mesh(part.geometry, part.material));
+  }
+  return group;
+}
+
+/**
+ * Releases the geometry/material of every `THREE.Mesh` found anywhere under `object` (itself
+ * included) — the disposal counterpart to `buildStaticObject`, which may have produced either a
+ * bare `Mesh` or a `Group` wrapping several. Safe to call on a plain `Mesh` too (traverses to
+ * just itself).
+ */
+export function disposeObject3D(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose();
+      disposeMaterial(child.material);
+    }
+  });
 }
 
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -110,14 +169,13 @@ export class CellMeshFactory {
   // Each is left unset (rather than throwing) when its model failed to load — see
   // `model-loader.ts`'s `loadAllModels` doc comment. A missing model means that one entity
   // type just never renders; it no longer takes every other entity type down with it.
-  private readonly playerMesh?: THREE.Mesh;
+  private readonly playerMesh?: THREE.Object3D;
   private readonly foodMesh?: THREE.InstancedMesh;
   private readonly botMeshes: Partial<Record<BotBehavior, THREE.InstancedMesh>> = {};
 
   constructor(models: ModelCache) {
     if (models.player_cell) {
-      const player = extractMesh(models.player_cell);
-      this.playerMesh = new THREE.Mesh(player.geometry, player.material);
+      this.playerMesh = buildStaticObject(models.player_cell);
       this.group.add(this.playerMesh);
     }
 
@@ -196,8 +254,7 @@ export class CellMeshFactory {
 
   dispose(): void {
     if (this.playerMesh) {
-      this.playerMesh.geometry.dispose();
-      disposeMaterial(this.playerMesh.material);
+      disposeObject3D(this.playerMesh);
     }
     const instancedMeshes = [this.foodMesh, ...Object.values(this.botMeshes)].filter(
       (mesh): mesh is THREE.InstancedMesh => mesh !== undefined,

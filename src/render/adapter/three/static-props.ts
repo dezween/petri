@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { ModelCache, ModelName } from "./model-loader";
-import { extractMesh } from "./cell-mesh-factory";
+import { buildStaticObject } from "./cell-mesh-factory";
 
 /**
  * Hand-picked (x, z) position + rotation-around-Y + scale for one prop instance. Fixed radius
@@ -47,12 +47,11 @@ export function buildStaticProps(models: ModelCache): THREE.Group {
     const model = models[placement.model];
     if (!model) continue; // this prop's .glb failed to load — skip only this one instance
 
-    const { geometry, material } = extractMesh(model);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(placement.x, 0, placement.z);
-    mesh.rotation.y = placement.rotationY;
-    mesh.scale.setScalar(placement.scale);
-    group.add(mesh);
+    const object = buildStaticObject(model);
+    object.position.set(placement.x, 0, placement.z);
+    object.rotation.y = placement.rotationY;
+    object.scale.setScalar(placement.scale);
+    group.add(object);
   }
 
   return group;

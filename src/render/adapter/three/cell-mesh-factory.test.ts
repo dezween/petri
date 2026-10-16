@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CellMeshFactory, radiusToScale } from "./cell-mesh-factory";
+import { CellMeshFactory, extractMesh, radiusToScale } from "./cell-mesh-factory";
 import type { ModelCache, ModelName } from "./model-loader";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import type { Bot } from "@/world/domain/bot.entity";
@@ -123,15 +123,44 @@ describe("CellMeshFactory", () => {
     for (const mesh of nonEmpty) expect(mesh.count).toBe(1);
   });
 
-  it("throws loudly (instead of silently dropping meshes) when a model contains more than one unjoined Mesh", () => {
-    // Regression test for the player_cell.glb bug: before its Blender script joined the
-    // membrane + nucleus objects into one mesh, the exported model had two sibling meshes
-    // and extractMesh() silently kept only the first one. extractMesh must now fail loudly
-    // instead, so this class of bug can't silently regress.
+  it("builds the player as a Group of all its meshes when the model has more than one primitive, instead of crashing", () => {
+    // Regression test for the real bug task 016's Playwright playtest caught: player_cell.glb
+    // legitimately has 2 primitives (translucent membrane + opaque nucleus, different
+    // materials), and GLTFLoader imports that as 2 sibling THREE.Mesh nodes, not 1 Mesh with a
+    // material array. CellMeshFactory's constructor used to call the strict single-mesh
+    // extractMesh() for the player too, so it threw on every real startup — aborting ALL
+    // entity+prop rendering, not just the player's. It must now build a Group containing both
+    // meshes and treat that Group as a single rigid unit for position/scale, same as it would
+    // treat a plain Mesh.
     const cache = fakeModelCache();
     cache.player_cell = fakeMultiMeshModel();
 
-    expect(() => new CellMeshFactory(cache)).toThrow(/2 meshes/);
+    const factory = new CellMeshFactory(cache);
+    const snapshot: WorldSnapshot = {
+      player: { id: "p1", position: { x: 7, z: -3 }, radius: 2, mass: 1 },
+      bots: [],
+      food: [],
+      arenaWidth: 1000,
+    };
+    factory.updateFromSnapshot(snapshot);
+
+    const playerObject = factory.group.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    expect(playerObject).toBeInstanceOf(THREE.Group);
+    expect(playerObject.children).toHaveLength(2);
+    for (const child of playerObject.children) expect(child).toBeInstanceOf(THREE.Mesh);
+    // Position/scale applied once to the Group moves/scales both meshes together.
+    expect(playerObject.position.x).toBeCloseTo(7);
+    expect(playerObject.position.z).toBeCloseTo(-3);
+    expect(playerObject.scale.x).toBeCloseTo(radiusToScale(2, "player_cell"));
+
+    expect(() => factory.dispose()).not.toThrow();
+  });
+
+  it("extractMesh (the strict single-mesh path used for InstancedMesh bots/food) still throws on a multi-mesh model", () => {
+    // InstancedMesh genuinely can't represent a multi-primitive model without more work (see
+    // extractMesh's doc comment) — none of the bot/food models currently need more than one
+    // primitive, and this throw is the intentional signal if that ever changes, not a bug.
+    expect(() => extractMesh(fakeMultiMeshModel())).toThrow(/2 meshes/);
   });
 
   it("reuses the same InstancedMesh objects across calls instead of rebuilding them", () => {
