@@ -10,6 +10,7 @@ import { loadAllModels } from "./model-loader";
 import { CellMeshFactory } from "./cell-mesh-factory";
 import { ParticleSystem } from "./particles";
 import { buildStaticProps } from "./static-props";
+import { PostProcessingPipeline } from "./post-processing";
 
 /**
  * `IRenderer` implementation backed by Three.js — the only place in this codebase that
@@ -25,6 +26,7 @@ export class ThreeRenderer implements IRenderer {
   private meshFactory?: CellMeshFactory;
   private readonly particleSystem: ParticleSystem;
   private staticProps?: THREE.Group;
+  private postProcessing?: PostProcessingPipeline;
 
   constructor(arenaWidth: number = DEFAULT_ARENA_WIDTH) {
     this.scene = createScene(arenaWidth);
@@ -40,6 +42,15 @@ export class ThreeRenderer implements IRenderer {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     updateCameraAspect(this.camera, safeAspect(container.clientWidth, container.clientHeight));
     container.appendChild(this.renderer.domElement);
+
+    // Epic 2, tasks 013-014: background blur + bloom, layered on top of the base scene render.
+    this.postProcessing = new PostProcessingPipeline(
+      this.renderer,
+      this.scene,
+      this.camera,
+      container.clientWidth,
+      container.clientHeight,
+    );
 
     loadAllModels()
       .then((models) => {
@@ -72,7 +83,15 @@ export class ThreeRenderer implements IRenderer {
     this.particleSystem.update(deltaTime);
     adjustZoomForPlayerRadius(this.camera, snapshot.player.radius);
     updateCameraPosition(this.camera, snapshot.player.position);
-    this.renderer.render(this.scene, this.camera);
+    if (this.postProcessing) {
+      this.postProcessing.render();
+    } else {
+      // Defensive fallback only — postProcessing is always constructed synchronously in init()
+      // right alongside `this.renderer`, so by the time the `!this.renderer` guard above has
+      // passed, postProcessing should exist too. Kept so a future refactor that decouples their
+      // construction doesn't silently stop rendering instead of degrading to a plain render.
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   /** Epic 2, task 008/009. Safe to call before `init()` (the particle system itself needs no
@@ -85,6 +104,7 @@ export class ThreeRenderer implements IRenderer {
     if (!this.renderer) return;
     this.renderer.setSize(width, height);
     updateCameraAspect(this.camera, safeAspect(width, height));
+    this.postProcessing?.setSize(width, height);
   }
 
   /**
@@ -110,6 +130,9 @@ export class ThreeRenderer implements IRenderer {
    * delete; a future lint/dead-code pass just won't have call-site context for it yet.
    */
   dispose(): void {
+    this.postProcessing?.dispose();
+    this.postProcessing = undefined;
+
     if (this.meshFactory) {
       // Remove before disposing: avoids any chance of the group's children still being
       // referenced by the scene's render graph while their GPU resources are being freed.
