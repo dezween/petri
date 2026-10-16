@@ -32,9 +32,18 @@ export interface WorldSnapshot {
   arenaWidth: number;
 }
 
+/** One eat occurrence this tick, generic across who ate whom — not just the player's own eats — so a future consumer (e.g. particle triggers) doesn't need a second, competing hook. */
+export interface EatenEvent {
+  eaterId: string;
+  eaterType: "player" | "bot";
+  eatenId: string;
+  eatenType: "player" | "bot" | "food";
+}
+
 export interface TickResult {
   playerEaten: boolean;
   victoryReached: boolean;
+  eatenEvents: EatenEvent[];
 }
 
 /**
@@ -69,7 +78,7 @@ export class WorldService {
     this.clampToArena(this.player);
     for (const bot of this.bots) this.clampToArena(bot);
 
-    const playerEaten = this.resolveCollisions();
+    const { playerEaten, eatenEvents } = this.resolveCollisions();
 
     this.player.radius = clampRadiusToCap(
       massToRadius(this.player.mass),
@@ -98,7 +107,7 @@ export class WorldService {
       if (spawned.length > 0) this.food.push(...spawned);
     }
 
-    return { playerEaten, victoryReached };
+    return { playerEaten, victoryReached, eatenEvents };
   }
 
   getSnapshot(): WorldSnapshot {
@@ -197,8 +206,9 @@ export class WorldService {
    * for every `resolveEating()` *decision* — growth is still applied to the live object so mass
    * correctly accumulates across multiple eats within the same tick, that part was never wrong.
    */
-  private resolveCollisions(): boolean {
+  private resolveCollisions(): { playerEaten: boolean; eatenEvents: EatenEvent[] } {
     let playerEaten = false;
+    const eatenEvents: EatenEvent[] = [];
     const startRadius = new Map<string, number>();
     const startMass = new Map<string, number>();
     startRadius.set(this.player.id, this.player.radius);
@@ -232,10 +242,11 @@ export class WorldService {
       this.player.mass = growMass(this.player.mass, bot.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenBotIds.add(bot.id);
+      eatenEvents.push({ eaterId: this.player.id, eaterType: "player", eatenId: bot.id, eatenType: "bot" });
     }
     this.bots = this.bots.filter((bot) => !eatenBotIds.has(bot.id));
 
-    if (playerEaten) return true;
+    if (playerEaten) return { playerEaten: true, eatenEvents };
 
     // Player vs food (food has no entry in startRadius, so frozen() passes it through as-is
     // — food's radius never changes mid-resolution, only the eater's does).
@@ -245,6 +256,7 @@ export class WorldService {
       this.player.mass = growMass(this.player.mass, food.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenFoodIds.add(food.id);
+      eatenEvents.push({ eaterId: this.player.id, eaterType: "player", eatenId: food.id, eatenType: "food" });
     }
 
     // Bot vs bot. Indices stay stable for the whole loop — removal is deferred to a
@@ -267,6 +279,7 @@ export class WorldService {
         eater.mass = growMass(eater.mass, eaten.mass);
         eater.radius = clampRadiusToCap(massToRadius(eater.mass), this.arenaWidth);
         eatenBotIds2.add(eaten.id);
+        eatenEvents.push({ eaterId: eater.id, eaterType: "bot", eatenId: eaten.id, eatenType: "bot" });
       }
     }
 
@@ -280,12 +293,13 @@ export class WorldService {
         bot.mass = growMass(bot.mass, food.mass);
         bot.radius = clampRadiusToCap(massToRadius(bot.mass), this.arenaWidth);
         eatenFoodIds.add(food.id);
+        eatenEvents.push({ eaterId: bot.id, eaterType: "bot", eatenId: food.id, eatenType: "food" });
       }
     }
 
     this.bots = this.bots.filter((bot) => !eatenBotIds2.has(bot.id));
     this.food = this.food.filter((food) => !eatenFoodIds.has(food.id));
 
-    return false;
+    return { playerEaten: false, eatenEvents };
   }
 }

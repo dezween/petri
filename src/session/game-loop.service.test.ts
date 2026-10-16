@@ -44,7 +44,9 @@ const fakeSnapshot: WorldSnapshot = {
   arenaWidth: 1000,
 };
 
-function createFakeWorldService(result: TickResult = { playerEaten: false, victoryReached: false }) {
+function createFakeWorldService(
+  result: TickResult = { playerEaten: false, victoryReached: false, eatenEvents: [] },
+) {
   return {
     tick: vi.fn(() => result),
     getSnapshot: vi.fn(() => fakeSnapshot),
@@ -110,7 +112,7 @@ describe("GameLoopService", () => {
 
   it("fires onPlayerEaten exactly once for a single death occurrence, even across multiple frames", () => {
     const { scheduler, fireNextFrame } = createFakeScheduler();
-    const world = createFakeWorldService({ playerEaten: true, victoryReached: false });
+    const world = createFakeWorldService({ playerEaten: true, victoryReached: false, eatenEvents: [] });
     const onPlayerEaten = vi.fn();
     const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), { onPlayerEaten }, scheduler);
 
@@ -123,7 +125,7 @@ describe("GameLoopService", () => {
 
   it("fires onVictoryReached exactly once for a single victory-cap occurrence, even across multiple frames", () => {
     const { scheduler, fireNextFrame } = createFakeScheduler();
-    const world = createFakeWorldService({ playerEaten: false, victoryReached: true });
+    const world = createFakeWorldService({ playerEaten: false, victoryReached: true, eatenEvents: [] });
     const onVictoryReached = vi.fn();
     const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), { onVictoryReached }, scheduler);
 
@@ -191,7 +193,7 @@ describe("GameLoopService", () => {
     // unreachable, but the loop must not rely on that alone — both flags true in one
     // TickResult must still only ever fire one callback.
     const { scheduler, fireNextFrame } = createFakeScheduler();
-    const world = createFakeWorldService({ playerEaten: true, victoryReached: true });
+    const world = createFakeWorldService({ playerEaten: true, victoryReached: true, eatenEvents: [] });
     const onPlayerEaten = vi.fn();
     const onVictoryReached = vi.fn();
     const loop = new GameLoopService(
@@ -207,6 +209,41 @@ describe("GameLoopService", () => {
 
     expect(onPlayerEaten).toHaveBeenCalledTimes(1);
     expect(onVictoryReached).not.toHaveBeenCalled();
+  });
+
+  it("fires onEntityEaten once per event in TickResult.eatenEvents, in order", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const eatenEvents: TickResult["eatenEvents"] = [
+      { eaterId: "player", eaterType: "player", eatenId: "food-1", eatenType: "food" },
+      { eaterId: "bot-1", eaterType: "bot", eatenId: "food-2", eatenType: "food" },
+    ];
+    const world = createFakeWorldService({ playerEaten: false, victoryReached: false, eatenEvents });
+    const onEntityEaten = vi.fn();
+    const loop = new GameLoopService(createFakeInput(), world, createFakeRenderer(), { onEntityEaten }, scheduler);
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(onEntityEaten).toHaveBeenCalledTimes(2);
+    expect(onEntityEaten).toHaveBeenNthCalledWith(1, eatenEvents[0]);
+    expect(onEntityEaten).toHaveBeenNthCalledWith(2, eatenEvents[1]);
+  });
+
+  it("does not call onEntityEaten when a tick reports no eaten events", () => {
+    const { scheduler, fireNextFrame } = createFakeScheduler();
+    const onEntityEaten = vi.fn();
+    const loop = new GameLoopService(
+      createFakeInput(),
+      createFakeWorldService(),
+      createFakeRenderer(),
+      { onEntityEaten },
+      scheduler,
+    );
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(onEntityEaten).not.toHaveBeenCalled();
   });
 
   it("stopping one loop and starting a second on the same scheduler leaves only the second loop's callbacks firing", () => {

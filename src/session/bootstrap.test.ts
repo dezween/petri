@@ -17,6 +17,7 @@ interface Call {
 
 const threeRendererCalls: Call[] = [];
 const mouseInputCalls: Call[] = [];
+const audioPlayerCalls: Call[] = [];
 const menuAdapterCalls: Call[] = [];
 const hudAdapterCalls: Call[] = [];
 const gameOverAdapterCalls: Call[] = [];
@@ -34,6 +35,22 @@ vi.mock("@/input/adapter/dom/mouse-input.adapter", () => ({
   MouseInputAdapter: vi.fn().mockImplementation((...args: unknown[]) => {
     mouseInputCalls.push({ args });
     return { __args: args, getDirection: vi.fn(), dispose: vi.fn() };
+  }),
+}));
+
+vi.mock("@/audio/adapter/html-audio/html-audio-player.adapter", () => ({
+  HtmlAudioPlayerAdapter: vi.fn().mockImplementation((...args: unknown[]) => {
+    audioPlayerCalls.push({ args });
+    return {
+      __args: args,
+      playSfx: vi.fn(),
+      playMusic: vi.fn(),
+      stopMusic: vi.fn(),
+      setSfxVolume: vi.fn(),
+      setMusicVolume: vi.fn(),
+      muteSfx: vi.fn(),
+      muteMusic: vi.fn(),
+    };
   }),
 }));
 
@@ -110,6 +127,7 @@ function buildElements(): BootstrapElements {
 beforeEach(() => {
   threeRendererCalls.length = 0;
   mouseInputCalls.length = 0;
+  audioPlayerCalls.length = 0;
   menuAdapterCalls.length = 0;
   hudAdapterCalls.length = 0;
   gameOverAdapterCalls.length = 0;
@@ -198,6 +216,7 @@ describe("bootstrap", () => {
     const deps = sessionStateCalls[0]!.args[0] as {
       inputSource: unknown;
       renderer: unknown;
+      audioPlayer: unknown;
       screens: { menu: unknown; hud: unknown; gameOver: unknown; victory: unknown };
       arenaWidth: number;
     };
@@ -207,6 +226,22 @@ describe("bootstrap", () => {
     expect(deps.renderer).toBe(renderer);
     expect(deps.arenaWidth).toBe(1500);
     expect(sessionState).toBeDefined();
+  });
+
+  it("constructs exactly one HtmlAudioPlayerAdapter and passes that same instance into SessionState", () => {
+    const elements = buildElements();
+
+    bootstrap(elements);
+
+    expect(audioPlayerCalls).toHaveLength(1);
+    const deps = sessionStateCalls[0]!.args[0] as { audioPlayer: unknown };
+    // The SFX/music URL Records are the adapter's first two constructor args — just confirm
+    // they're present and non-empty, not every URL's exact value (audio-urls.test.ts already
+    // covers that).
+    const [sfxUrls, musicUrls] = audioPlayerCalls[0]!.args as [Record<string, string>, Record<string, string>];
+    expect(Object.keys(sfxUrls).length).toBeGreaterThan(0);
+    expect(Object.keys(musicUrls).length).toBeGreaterThan(0);
+    expect(deps.audioPlayer).toBeDefined();
   });
 
   it("returns the same renderer instance it constructed, for main.ts's resize listener to call", () => {
