@@ -128,7 +128,7 @@ function buildElements(): BootstrapElements {
       root: fakeElement(),
       playButton: fakeButton(),
       settingsButton: fakeButton(),
-      sizeButtons: { small: fakeButton(), medium: fakeButton(), large: fakeButton() },
+      sizeButtons: { buttons: Array.from({ length: 10 }, () => fakeButton()) },
     },
     hud: { root: fakeElement(), massValue: fakeElement() },
     gameOver: {

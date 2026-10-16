@@ -11,10 +11,20 @@
     <div id="menu-screen" class="screen" hidden>
       <h1 class="screen__title">Petri</h1>
       <p class="screen__instructions">Move with your cursor. Eat smaller cells. Avoid bigger ones.</p>
+      <!-- One button per src/ui/adapter/dom/menu.adapter.ts's ARENA_SIZES entry, same order —
+           labeled with the arena's actual width (not an abstract tier name like the original
+           three's Small/Medium/Large, which doesn't scale cleanly to ten options). -->
       <div class="size-picker" role="group" aria-label="Arena size">
-        <button id="menu-size-small" type="button" class="size-picker__button size-picker__button--active">Small</button>
-        <button id="menu-size-medium" type="button" class="size-picker__button">Medium</button>
-        <button id="menu-size-large" type="button" class="size-picker__button">Large</button>
+        <button id="menu-size-0" type="button" class="size-picker__button size-picker__button--active">1000</button>
+        <button id="menu-size-1" type="button" class="size-picker__button">1250</button>
+        <button id="menu-size-2" type="button" class="size-picker__button">1500</button>
+        <button id="menu-size-3" type="button" class="size-picker__button">1750</button>
+        <button id="menu-size-4" type="button" class="size-picker__button">2000</button>
+        <button id="menu-size-5" type="button" class="size-picker__button">2250</button>
+        <button id="menu-size-6" type="button" class="size-picker__button">2500</button>
+        <button id="menu-size-7" type="button" class="size-picker__button">2750</button>
+        <button id="menu-size-8" type="button" class="size-picker__button">3000</button>
+        <button id="menu-size-9" type="button" class="size-picker__button">3250</button>
       </div>
       <button id="menu-play-button" type="button" class="screen__button">Play</button>
       <button id="menu-settings-button" type="button" class="screen__button screen__button--secondary">Settings</button>

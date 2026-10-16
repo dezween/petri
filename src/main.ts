@@ -1,5 +1,6 @@
 import "./ui/styles/main.scss";
 import { bootstrap } from "@/session/bootstrap";
+import { ARENA_SIZES } from "@/ui/adapter/dom/menu.adapter";
 
 /** Throws with the element's id in the message if it's missing — fail loudly at startup, not with a silent null deref three layers deep. */
 function required<T extends HTMLElement>(id: string): T {
@@ -17,10 +18,12 @@ const { renderer } = bootstrap(
       root: required("menu-screen"),
       playButton: required("menu-play-button"),
       settingsButton: required("menu-settings-button"),
+      // One button per ARENA_SIZES entry, same order — index.html has one `#menu-size-N` per
+      // entry, so deriving the count from ARENA_SIZES.length (not a hardcoded 10) means this
+      // stays correct if the list is ever resized again without anyone having to remember to
+      // update a second, unrelated-looking number here.
       sizeButtons: {
-        small: required("menu-size-small"),
-        medium: required("menu-size-medium"),
-        large: required("menu-size-large"),
+        buttons: ARENA_SIZES.map((_, i) => required<HTMLButtonElement>(`menu-size-${i}`)),
       },
     },
     hud: {

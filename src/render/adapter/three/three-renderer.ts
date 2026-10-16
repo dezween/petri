@@ -4,7 +4,7 @@ import type { WorldSnapshot } from "@/world/service/world.service";
 import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
 import type { Vector2 } from "@/world/domain/geometry";
 import { buildArenaFloorAndRim, createScene } from "./scene";
-import { addLighting } from "./lighting";
+import { addLighting, configureShadowFrustum } from "./lighting";
 import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
 import { CellMeshFactory, disposeObject3D } from "./cell-mesh-factory";
@@ -21,6 +21,7 @@ import { PostProcessingPipeline } from "./post-processing";
 export class ThreeRenderer implements IRenderer {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.OrthographicCamera;
+  private readonly light: THREE.DirectionalLight;
   private renderer?: THREE.WebGLRenderer;
   private container?: HTMLElement;
   private meshFactory?: CellMeshFactory;
@@ -30,7 +31,7 @@ export class ThreeRenderer implements IRenderer {
 
   constructor(arenaWidth: number = DEFAULT_ARENA_WIDTH) {
     this.scene = createScene(arenaWidth);
-    addLighting(this.scene);
+    this.light = addLighting(this.scene, arenaWidth);
     this.camera = createCamera(1);
     this.particleSystem = new ParticleSystem();
     this.scene.add(this.particleSystem.points);
@@ -113,11 +114,13 @@ export class ThreeRenderer implements IRenderer {
   }
 
   /**
-   * Rebuilds just the floor/rim in place at a new arena width (Epic 2, task 001) — the
-   * lighting, camera, and entity-mesh group are independent of arenaWidth and stay untouched.
-   * Reuses the same named-mesh disposal `dispose()` relies on, so the old floor/rim's GPU
-   * resources never leak across a resize the way they would with a naive "just add a new one"
-   * approach.
+   * Rebuilds the floor/rim in place at a new arena width (Epic 2, task 001) and reconfigures the
+   * shadow camera's frustum/depth-range to match (Epic 3, task 002 + the 10-size follow-up) —
+   * the camera and entity-mesh group are independent of arenaWidth and stay untouched. The light
+   * itself is reused, not recreated: `configureShadowFrustum` only touches its shadow-camera
+   * properties. Reuses the same named-mesh disposal `dispose()` relies on, so the old floor/rim's
+   * GPU resources never leak across a resize the way they would with a naive "just add a new
+   * one" approach.
    */
   setArenaWidth(width: number): void {
     this.disposeNamedMesh("arena-floor");
@@ -126,6 +129,8 @@ export class ThreeRenderer implements IRenderer {
     const { floor, rim } = buildArenaFloorAndRim(width);
     this.scene.add(floor);
     this.scene.add(rim);
+
+    configureShadowFrustum(this.light, width);
   }
 
   /**

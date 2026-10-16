@@ -13,16 +13,19 @@ const RIM_TUBE_RADIUS_FRACTION = 0.015;
 const BENCH_COLOR = 0x33393a;
 /**
  * Epic 2, task 010: sized to stay fully visible beneath the camera's frustum at the most
- * extreme case — Large arena (width 2000, so a 1000-radius player roam area) combined with
- * the camera's maximum zoom-out (player radius at the victory cap: 2000 * 0.375 = 750) and a
- * generously wide aspect ratio (ultrawide/multi-monitor, assumed up to ~3:1). Worked out from
- * `camera.ts`'s `adjustZoomForPlayerRadius`: halfHeight at that player radius is
- * 600 + 750 * (2.2/4) ≈ 1012, so halfWidth at aspect 3 ≈ 3037. The camera can additionally be
- * up to 1000 units off-origin (the player's own roam radius), so the farthest point the
- * frustum could need covered from world origin is on the order of
- * 1000 + sqrt(1012² + 3037²) ≈ 4200. 6000 leaves comfortable headroom beyond that worst case.
+ * extreme case. Re-derived for the 10-arena-size follow-up — the largest size is now 3250
+ * (`ARENA_SIZES` in `src/ui/adapter/dom/menu.adapter.ts`), not the original fixed Large (2000):
+ * a 1625-radius player roam area combined with the camera's maximum zoom-out (player radius at
+ * the victory cap: 3250 * 0.375 ≈ 1219) and a generously wide aspect ratio
+ * (ultrawide/multi-monitor, assumed up to ~3:1). Worked out from `camera.ts`'s
+ * `adjustZoomForPlayerRadius`: halfHeight at that player radius is 600 + 1219 * (2.2/4) ≈ 1270,
+ * so halfWidth at aspect 3 ≈ 3811. The camera can additionally be up to 1625 units off-origin
+ * (the player's own roam radius), so the farthest point the frustum could need covered from
+ * world origin is on the order of 1625 + sqrt(1270² + 3811²) ≈ 5642. 7000 leaves comfortable
+ * headroom beyond that worst case (the original 6000 would have left only ~360 units of
+ * margin at this new maximum, tighter than this constant's original intent).
  */
-const BENCH_RADIUS = 6000;
+const BENCH_RADIUS = 7000;
 
 /**
  * Builds the static scene content: the lab-bench ground plane, the flat arena floor, and its
