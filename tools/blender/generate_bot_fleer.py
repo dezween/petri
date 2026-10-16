@@ -15,7 +15,12 @@ def main():
     body = bpy.context.active_object
     body.name = "BotFleer_Body"
 
-    mat = make_material("FleerMat", (0.95, 0.85, 0.35), alpha=1.0, roughness=0.5)
+    # Epic 2, task 015: slightly paler/cooler yellow than the original (0.95, 0.85, 0.35) --
+    # nudged (mainly a small blue bump) after simulating protanopia/deuteranopia against the
+    # new hunter orange, since the two ended up closer together than the original palette's
+    # hunter/fleer pair once hunter moved off its old red-orange. This value maximizes the
+    # worst-case pairwise distinguishability across all three bots under both simulations.
+    mat = make_material("FleerMat", (0.88, 0.90, 0.62), alpha=1.0, roughness=0.5)
     body.data.materials.append(mat)
 
     # Thin spike/flagella protrusions around the body

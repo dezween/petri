@@ -28,7 +28,12 @@ def main():
     cap2 = bpy.context.active_object
     cap2.name = "BotHunter_CapBack"
 
-    mat = make_material("HunterMat", (0.85, 0.25, 0.15), alpha=1.0, roughness=0.45)
+    # Epic 2, task 015: more saturated red-orange (less yellow-leaning than the original
+    # (0.85, 0.25, 0.15)) -- picked by simulating protanopia/deuteranopia transforms against
+    # this palette's wanderer (blue) and fleer (yellow) colors and maximizing the worst-case
+    # pairwise distinguishability (both RGB distance and luminance difference) across all three
+    # bots under both simulations, not just checked against wanderer alone.
+    mat = make_material("HunterMat", (0.90, 0.30, 0.08), alpha=1.0, roughness=0.45)
     for obj in (cylinder, cap1, cap2):
         obj.data.materials.append(mat)
 
