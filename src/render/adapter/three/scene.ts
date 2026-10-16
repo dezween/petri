@@ -69,6 +69,9 @@ function buildLabBench(): THREE.Mesh {
   // Slightly below the dish floor (which sits at y=0) to avoid z-fighting where they overlap.
   bench.position.y = -0.5;
   bench.name = "lab-bench";
+  // Epic 3, task 002: receives shadows cast by entities/props (task 003); nothing shadows onto
+  // it from below, so it's not a caster — see docs/epic-3/SPEC.md's Design Decision 2.
+  bench.receiveShadow = true;
   return bench;
 }
 
@@ -92,6 +95,9 @@ export function buildArenaFloorAndRim(arenaWidth: number): { floor: THREE.Mesh; 
   // codebase's Vector2 ({x, z}) assumes.
   floor.rotation.x = -Math.PI / 2;
   floor.name = "arena-floor";
+  // Epic 3, task 002: receives shadows cast by entities/props (task 003) — not a caster, see
+  // buildLabBench's identical comment / SPEC.md's Design Decision 2.
+  floor.receiveShadow = true;
 
   const rimTubeRadius = arenaRadius * RIM_TUBE_RADIUS_FRACTION;
   const rimGeometry = new THREE.TorusGeometry(arenaRadius, rimTubeRadius, 16, 96);
@@ -106,6 +112,8 @@ export function buildArenaFloorAndRim(arenaWidth: number): { floor: THREE.Mesh; 
   // TorusGeometry lies flat in XY by default too; same rotation as the floor.
   rim.rotation.x = -Math.PI / 2;
   rim.name = "arena-rim";
+  // Epic 3, task 002: receives shadows — not a caster, see buildLabBench's identical comment.
+  rim.receiveShadow = true;
 
   return { floor, rim };
 }

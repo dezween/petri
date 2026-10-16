@@ -163,6 +163,62 @@ describe("CellMeshFactory", () => {
     expect(() => extractMesh(fakeMultiMeshModel())).toThrow(/2 meshes/);
   });
 
+  it("elevates entities a fraction of their own radius above the floor, not y=0 (Epic 3, task 003)", () => {
+    // Regression test for a real visual bug a Playwright screenshot caught: at y=0, a sphere's
+    // own origin/center sits exactly at floor height, so half its geometry is embedded in the
+    // floor and its own shadow falls almost directly beneath its self-occluding upper half —
+    // invisible. Elevating by a fraction of the entity's radius surfaces enough of it for a
+    // shadow to actually show.
+    const factory = new CellMeshFactory(fakeModelCache());
+    const snapshot: WorldSnapshot = {
+      player: { id: "p1", position: { x: 0, z: 0 }, radius: 40, mass: 25 },
+      bots: [bot("b1", "hunter", 5, 20)],
+      food: [], // kept empty so the food InstancedMesh's count stays 0 — otherwise it'd also
+      // match the "count === 1" lookup below and this test would silently check the wrong mesh.
+      arenaWidth: 1000,
+    };
+
+    factory.updateFromSnapshot(snapshot);
+
+    const playerMesh = factory.group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(playerMesh.position.y).toBeGreaterThan(0);
+    expect(playerMesh.position.y).toBeCloseTo(40 * 0.4);
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const hunterMesh = factory.group.children.find(
+      (c) => c instanceof THREE.InstancedMesh && (c as THREE.InstancedMesh).count === 1,
+    ) as THREE.InstancedMesh;
+    hunterMesh.getMatrixAt(0, matrix);
+    position.setFromMatrixPosition(matrix);
+    expect(position.y).toBeCloseTo(20 * 0.4);
+  });
+
+  it("makes the player mesh, food, and every bot InstancedMesh cast shadows (Epic 3, task 003)", () => {
+    const factory = new CellMeshFactory(fakeModelCache());
+
+    const playerMesh = factory.group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(playerMesh.castShadow).toBe(true);
+
+    const instancedMeshes = factory.group.children.filter(
+      (c) => c instanceof THREE.InstancedMesh,
+    ) as THREE.InstancedMesh[];
+    expect(instancedMeshes).toHaveLength(4); // food + 3 bot behaviors
+    for (const mesh of instancedMeshes) expect(mesh.castShadow).toBe(true);
+  });
+
+  it("casts shadows from every child mesh when the player model has more than one primitive", () => {
+    const cache = fakeModelCache();
+    cache.player_cell = fakeMultiMeshModel();
+    const factory = new CellMeshFactory(cache);
+
+    const playerGroup = factory.group.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    expect(playerGroup.children).toHaveLength(2);
+    for (const child of playerGroup.children) {
+      expect((child as THREE.Mesh).castShadow).toBe(true);
+    }
+  });
+
   it("reuses the same InstancedMesh objects across calls instead of rebuilding them", () => {
     const factory = new CellMeshFactory(fakeModelCache());
     const before = factory.group.children.filter((c) => c instanceof THREE.InstancedMesh);
