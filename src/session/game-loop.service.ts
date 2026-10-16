@@ -92,6 +92,13 @@ export class GameLoopService {
       this.callbacks.onVictoryReached?.();
     }
 
+    // The callbacks above are the hook SessionState uses to call stop() synchronously (e.g.
+    // onVictoryReached -> enterVictory() -> stopLoop()) — that stop() call sets rafHandle to
+    // null. Without this check, the unconditional requestFrame below would immediately
+    // overwrite that null and keep the loop running forever, even though stop() "already ran":
+    // the world would keep ticking (food still gets eaten, SFX keep firing) underneath the
+    // GameOver/Victory screen. Only reschedule if nothing stopped us during this tick.
+    if (this.rafHandle === null) return;
     this.rafHandle = this.scheduler.requestFrame(this.tick);
   };
 }

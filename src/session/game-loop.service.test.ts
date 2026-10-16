@@ -248,6 +248,31 @@ describe("GameLoopService", () => {
     expect(onEntityEaten).not.toHaveBeenCalled();
   });
 
+  it("does not keep ticking after a callback synchronously calls stop() (regression: SessionState's onVictoryReached/onPlayerEaten do exactly this)", () => {
+    const { scheduler, fireNextFrame, pendingCount } = createFakeScheduler();
+    const world = createFakeWorldService({ playerEaten: false, victoryReached: true, eatenEvents: [] });
+    const loop = new GameLoopService(
+      createFakeInput(),
+      world,
+      createFakeRenderer(),
+      // Mirrors SessionState.enterVictory(): the callback itself calls loop.stop() before
+      // returning, the same way enterVictory() -> stopLoop() -> gameLoop.stop() does.
+      { onVictoryReached: () => loop.stop() },
+      scheduler,
+    );
+
+    loop.start();
+    fireNextFrame(16);
+
+    expect(pendingCount()).toBe(0);
+    expect(loop.isRunning).toBe(false);
+
+    // Even if something external fired another frame anyway, the world must not tick again —
+    // belt-and-suspenders against the exact bug this test guards (the loop rescheduling itself
+    // after stop() already ran inside the callback).
+    expect(world.tick).toHaveBeenCalledTimes(1);
+  });
+
   it("stopping one loop and starting a second on the same scheduler leaves only the second loop's callbacks firing", () => {
     // Directly exercises the sequential stop-then-replace pattern SessionState.play() relies
     // on for leak-free Restarts: constructing a second GameLoopService sharing the same
