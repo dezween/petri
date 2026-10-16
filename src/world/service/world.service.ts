@@ -220,9 +220,19 @@ export class WorldService {
    * by array order). `mass` is now frozen alongside `radius` and the frozen snapshot is used
    * for every `resolveEating()` *decision* — growth is still applied to the live object so mass
    * correctly accumulates across multiple eats within the same tick, that part was never wrong.
+   *
+   * Bug fix (second follow-up): the `playerEaten` boolean above was order-independent (fixed),
+   * but the *final mass* shown on Game Over and *which* `EatenEvent`s fire were not — the old
+   * single-pass loop applied growth/events for bots processed before the fatal one was reached,
+   * then `break`d, so `bots = [smaller, bigger]` grew the player's mass (and fired an eat-bot
+   * event) before dying, while `bots = [bigger, smaller]` died immediately with neither. Fixed
+   * by splitting into two passes over the frozen snapshot: first, determine (without mutating
+   * anything) whether *any* bot defeats the player this tick; if so, the player dies with no
+   * growth/events applied at all this tick, regardless of array order. Only if no bot kills the
+   * player does the second pass apply growth — which was already order-independent on its own,
+   * since each decision and `growMass` are already commutative given the frozen snapshot.
    */
   private resolveCollisions(): { playerEaten: boolean; eatenEvents: EatenEvent[] } {
-    let playerEaten = false;
     const eatenEvents: EatenEvent[] = [];
     const startRadius = new Map<string, number>();
     const startMass = new Map<string, number>();
@@ -243,17 +253,32 @@ export class WorldService {
     // Player vs bots. Eating decisions use the frozen (start-of-tick) mass/radius snapshot
     // so the outcome can't depend on which bot happens to be evaluated first; growth is still
     // applied to the live `this.player`/`bot` objects so it accumulates across multiple eats.
-    const eatenBotIds = new Set<string>();
+    //
+    // First pass (read-only): does any bot defeat the player this tick? Checked before any
+    // mutation so that, for a simultaneous multi-bot overlap, the player's death — and the
+    // fact that no growth/eat-events are applied this tick — never depends on `this.bots`'
+    // iteration order.
     const frozenPlayer = frozen(this.player);
+    const killerBot = this.bots.find((bot) => {
+      const frozenBot = frozen(bot);
+      if (!isOverlapping(frozenPlayer, frozenBot)) return false;
+      const result = resolveEating(frozenPlayer, frozenBot);
+      return result?.eaten.id === this.player.id;
+    });
+    if (killerBot) {
+      return { playerEaten: true, eatenEvents: [] };
+    }
+
+    // Second pass: no bot kills the player this tick, so it's safe to apply growth for every
+    // bot the player overlaps and beats. This was already order-independent on its own (each
+    // decision reads the frozen snapshot, and growMass is commutative), so a single pass here
+    // is fine now that the fatal case above is handled separately.
+    const eatenBotIds = new Set<string>();
     for (const bot of this.bots) {
       const frozenBot = frozen(bot);
       if (!isOverlapping(frozenPlayer, frozenBot)) continue;
       const result = resolveEating(frozenPlayer, frozenBot);
       if (!result) continue;
-      if (result.eaten.id === this.player.id) {
-        playerEaten = true;
-        break;
-      }
       this.player.mass = growMass(this.player.mass, bot.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenBotIds.add(bot.id);
@@ -267,8 +292,6 @@ export class WorldService {
       });
     }
     this.bots = this.bots.filter((bot) => !eatenBotIds.has(bot.id));
-
-    if (playerEaten) return { playerEaten: true, eatenEvents };
 
     // Player vs food (food has no entry in startRadius, so frozen() passes it through as-is
     // — food's radius never changes mid-resolution, only the eater's does).

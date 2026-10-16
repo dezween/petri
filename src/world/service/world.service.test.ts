@@ -170,6 +170,37 @@ describe("WorldService.tick — collisions", () => {
     expect(orderAB.result.playerEaten).toBe(orderBA.result.playerEaten);
   });
 
+  it("resolves a simultaneous multi-entity overlap with identical final mass and eaten-events, independent of array order (WR-01 regression)", () => {
+    // Same setup as above, but this asserts the OUTCOME (final player mass, eaten-events),
+    // not just the playerEaten boolean. Before the fix, bots = [smaller, bigger] let the
+    // player eat `smaller` (growing mass, firing an eat-bot event) before dying to `bigger`,
+    // while bots = [bigger, smaller] killed the player immediately with neither — same
+    // boolean, different mass/events, purely from this.bots' iteration order.
+    const run = (bots: Bot[]) => {
+      const player = makePlayer({ mass: 10, position: { x: 0, z: 0 } });
+      const world = new WorldService(player, bots, []);
+      const result = world.tick(1 / 60, { x: 0, z: 0 });
+      return { result, snapshot: world.getSnapshot() };
+    };
+
+    const smaller = () => makeBot({ id: "smaller", mass: 8, position: { x: 0, z: 0 } });
+    const bigger = () => makeBot({ id: "bigger", mass: 15, position: { x: 0, z: 0 } });
+
+    const orderAB = run([smaller(), bigger()]);
+    const orderBA = run([bigger(), smaller()]);
+
+    expect(orderAB.result.playerEaten).toBe(true);
+    expect(orderBA.result.playerEaten).toBe(true);
+    // Final mass must match regardless of order — no growth should be applied in either case
+    // since the player died this tick.
+    expect(orderAB.snapshot.player.mass).toBe(10);
+    expect(orderBA.snapshot.player.mass).toBe(10);
+    expect(orderAB.snapshot.player.mass).toBe(orderBA.snapshot.player.mass);
+    // No eat-bot event should fire in either order when the player dies the same tick.
+    expect(orderAB.result.eatenEvents).toHaveLength(0);
+    expect(orderBA.result.eatenEvents).toHaveLength(0);
+  });
+
   it("caps a bot's radius at the victory-cap fraction, instead of letting it grow past the arena and snap to center", () => {
     const player = makePlayer({ position: { x: 500, z: 500 } }); // far away, uninvolved
     // Bot already near the cap; eating one more large bot should clamp its radius rather
