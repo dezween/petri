@@ -61,6 +61,7 @@ function createFakeRenderer(): IRenderer {
   return {
     init: vi.fn(),
     render: vi.fn(),
+    spawnEatBurst: vi.fn(),
     resize: vi.fn(),
     setArenaWidth: vi.fn(),
     dispose: vi.fn(),
@@ -80,7 +81,8 @@ describe("GameLoopService", () => {
 
     expect(input.getDirection).toHaveBeenCalled();
     expect(world.tick).toHaveBeenCalledWith(0, { x: 1, z: 0 });
-    expect(renderer.render).toHaveBeenCalledWith(fakeSnapshot);
+    // First-ever frame has no prior timestamp to diff against, so deltaTime is 0.
+    expect(renderer.render).toHaveBeenCalledWith(fakeSnapshot, 0);
   });
 
   it("computes deltaTime from real elapsed time between frames, not a fixed value", () => {
@@ -214,8 +216,8 @@ describe("GameLoopService", () => {
   it("fires onEntityEaten once per event in TickResult.eatenEvents, in order", () => {
     const { scheduler, fireNextFrame } = createFakeScheduler();
     const eatenEvents: TickResult["eatenEvents"] = [
-      { eaterId: "player", eaterType: "player", eatenId: "food-1", eatenType: "food" },
-      { eaterId: "bot-1", eaterType: "bot", eatenId: "food-2", eatenType: "food" },
+      { eaterId: "player", eaterType: "player", eatenId: "food-1", eatenType: "food", position: { x: 1, z: 2 } },
+      { eaterId: "bot-1", eaterType: "bot", eatenId: "food-2", eatenType: "food", position: { x: 3, z: 4 } },
     ];
     const world = createFakeWorldService({ playerEaten: false, victoryReached: false, eatenEvents });
     const onEntityEaten = vi.fn();

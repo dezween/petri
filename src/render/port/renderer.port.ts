@@ -1,4 +1,5 @@
 import type { WorldSnapshot } from "@/world/service/world.service";
+import type { Vector2 } from "@/world/domain/geometry";
 
 /**
  * Contract the `session` module calls through. Deliberately free of any `three` import so
@@ -9,8 +10,16 @@ export interface IRenderer {
   /** Mounts the renderer's canvas into `container`. Called once, before the first `render()`. */
   init(container: HTMLElement): void;
 
-  /** Called once per frame with the latest world state. */
-  render(snapshot: WorldSnapshot): void;
+  /** Called once per frame with the latest world state and the frame's deltaTime in seconds
+   * (the same value just passed to `WorldService.tick()` — reused rather than the renderer
+   * keeping its own clock, so a particle system's aging can't drift from the game's own
+   * timing). */
+  render(snapshot: WorldSnapshot, deltaTime: number): void;
+
+  /** Spawns a short-lived particle burst at `position`, tinted `color` (a `0xRRGGBB` hex
+   * integer — Epic 2, task 008/009). Fire-and-forget: the renderer owns the burst's whole
+   * lifecycle internally from here, aged out automatically on subsequent `render()` calls. */
+  spawnEatBurst(position: Vector2, color: number): void;
 
   /** Called when the host element's size changes. */
   resize(width: number, height: number): void;

@@ -2,7 +2,7 @@ import type { Vector2 } from "../domain/geometry";
 import { isOverlapping } from "../domain/geometry";
 import type { Cell, Player } from "../domain/cell.entity";
 import { massToRadius } from "../domain/cell.entity";
-import type { Bot } from "../domain/bot.entity";
+import type { Bot, BotBehavior } from "../domain/bot.entity";
 import type { Food } from "../domain/food.entity";
 import {
   clampRadiusToCap,
@@ -32,12 +32,20 @@ export interface WorldSnapshot {
   arenaWidth: number;
 }
 
-/** One eat occurrence this tick, generic across who ate whom — not just the player's own eats — so a future consumer (e.g. particle triggers) doesn't need a second, competing hook. */
+/**
+ * One eat occurrence this tick, generic across who ate whom — not just the player's own eats —
+ * so a future consumer (e.g. particle triggers) doesn't need a second, competing hook.
+ * `position` is the eaten entity's position at the moment it was eaten (for spawning an effect
+ * there); `eatenBehavior` is set only when `eatenType === "bot"`, so a consumer can color/style
+ * the effect per bot personality rather than a single generic look.
+ */
 export interface EatenEvent {
   eaterId: string;
   eaterType: "player" | "bot";
   eatenId: string;
   eatenType: "player" | "bot" | "food";
+  position: Vector2;
+  eatenBehavior?: BotBehavior;
 }
 
 export interface TickResult {
@@ -242,7 +250,14 @@ export class WorldService {
       this.player.mass = growMass(this.player.mass, bot.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenBotIds.add(bot.id);
-      eatenEvents.push({ eaterId: this.player.id, eaterType: "player", eatenId: bot.id, eatenType: "bot" });
+      eatenEvents.push({
+        eaterId: this.player.id,
+        eaterType: "player",
+        eatenId: bot.id,
+        eatenType: "bot",
+        position: { ...bot.position },
+        eatenBehavior: bot.behavior,
+      });
     }
     this.bots = this.bots.filter((bot) => !eatenBotIds.has(bot.id));
 
@@ -256,7 +271,13 @@ export class WorldService {
       this.player.mass = growMass(this.player.mass, food.mass);
       this.player.radius = massToRadius(this.player.mass);
       eatenFoodIds.add(food.id);
-      eatenEvents.push({ eaterId: this.player.id, eaterType: "player", eatenId: food.id, eatenType: "food" });
+      eatenEvents.push({
+        eaterId: this.player.id,
+        eaterType: "player",
+        eatenId: food.id,
+        eatenType: "food",
+        position: { ...food.position },
+      });
     }
 
     // Bot vs bot. Indices stay stable for the whole loop — removal is deferred to a
@@ -279,7 +300,14 @@ export class WorldService {
         eater.mass = growMass(eater.mass, eaten.mass);
         eater.radius = clampRadiusToCap(massToRadius(eater.mass), this.arenaWidth);
         eatenBotIds2.add(eaten.id);
-        eatenEvents.push({ eaterId: eater.id, eaterType: "bot", eatenId: eaten.id, eatenType: "bot" });
+        eatenEvents.push({
+          eaterId: eater.id,
+          eaterType: "bot",
+          eatenId: eaten.id,
+          eatenType: "bot",
+          position: { ...eaten.position },
+          eatenBehavior: eaten.behavior,
+        });
       }
     }
 
@@ -293,7 +321,13 @@ export class WorldService {
         bot.mass = growMass(bot.mass, food.mass);
         bot.radius = clampRadiusToCap(massToRadius(bot.mass), this.arenaWidth);
         eatenFoodIds.add(food.id);
-        eatenEvents.push({ eaterId: bot.id, eaterType: "bot", eatenId: food.id, eatenType: "food" });
+        eatenEvents.push({
+          eaterId: bot.id,
+          eaterType: "bot",
+          eatenId: food.id,
+          eatenType: "food",
+          position: { ...food.position },
+        });
       }
     }
 

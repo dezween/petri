@@ -2,11 +2,13 @@ import * as THREE from "three";
 import type { IRenderer } from "@/render/port/renderer.port";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
+import type { Vector2 } from "@/world/domain/geometry";
 import { buildArenaFloorAndRim, createScene } from "./scene";
 import { addLighting } from "./lighting";
 import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
 import { CellMeshFactory } from "./cell-mesh-factory";
+import { ParticleSystem } from "./particles";
 
 /**
  * `IRenderer` implementation backed by Three.js — the only place in this codebase that
@@ -20,11 +22,14 @@ export class ThreeRenderer implements IRenderer {
   private renderer?: THREE.WebGLRenderer;
   private container?: HTMLElement;
   private meshFactory?: CellMeshFactory;
+  private readonly particleSystem: ParticleSystem;
 
   constructor(arenaWidth: number = DEFAULT_ARENA_WIDTH) {
     this.scene = createScene(arenaWidth);
     addLighting(this.scene);
     this.camera = createCamera(1);
+    this.particleSystem = new ParticleSystem();
+    this.scene.add(this.particleSystem.points);
   }
 
   init(container: HTMLElement): void {
@@ -52,12 +57,19 @@ export class ThreeRenderer implements IRenderer {
       });
   }
 
-  render(snapshot: WorldSnapshot): void {
+  render(snapshot: WorldSnapshot, deltaTime: number): void {
     if (!this.renderer) return;
     this.meshFactory?.updateFromSnapshot(snapshot);
+    this.particleSystem.update(deltaTime);
     adjustZoomForPlayerRadius(this.camera, snapshot.player.radius);
     updateCameraPosition(this.camera, snapshot.player.position);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Epic 2, task 008/009. Safe to call before `init()` (the particle system itself needs no
+   * WebGL context) — it just won't be visible until a real `render()` call draws the scene. */
+  spawnEatBurst(position: Vector2, color: number): void {
+    this.particleSystem.burst(position, color);
   }
 
   resize(width: number, height: number): void {
@@ -101,6 +113,9 @@ export class ThreeRenderer implements IRenderer {
     // state (render lists, program cache, etc.), never the scene graph's own GPU resources.
     this.disposeNamedMesh("arena-floor");
     this.disposeNamedMesh("arena-rim");
+
+    this.scene.remove(this.particleSystem.points);
+    this.particleSystem.dispose();
 
     if (this.renderer && this.container) {
       this.container.removeChild(this.renderer.domElement);

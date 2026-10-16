@@ -112,7 +112,14 @@ function createFakeInput(): IInputSource {
 }
 
 function createFakeRenderer(): IRenderer {
-  return { init: vi.fn(), render: vi.fn(), resize: vi.fn(), setArenaWidth: vi.fn(), dispose: vi.fn() };
+  return {
+    init: vi.fn(),
+    render: vi.fn(),
+    spawnEatBurst: vi.fn(),
+    resize: vi.fn(),
+    setArenaWidth: vi.fn(),
+    dispose: vi.fn(),
+  };
 }
 
 function createFakeAudioPlayer(): IAudioPlayer {
@@ -400,6 +407,7 @@ describe("SessionState", () => {
         eaterType: "player",
         eatenId: "food-1",
         eatenType: "food",
+        position: { x: 1, z: 2 },
       });
 
       expect(audioPlayer.playSfx).toHaveBeenCalledWith("eat-food");
@@ -415,14 +423,59 @@ describe("SessionState", () => {
         eaterType: "player",
         eatenId: "bot-1",
         eatenType: "bot",
+        position: { x: 3, z: 4 },
+        eatenBehavior: "wanderer",
       });
 
       expect(audioPlayer.playSfx).toHaveBeenCalledWith("eat-bot");
       expect(audioPlayer.playSfx).not.toHaveBeenCalledWith("eat-food");
     });
 
-    it("ignores eatenEvents where a bot is the eater, not the player — no SFX for bot-eats-bot/food", () => {
-      const { menu, audioPlayer } = setup();
+    it("spawns a particle burst at the eaten entity's position when the player eats food (Epic 2, task 009)", () => {
+      const { menu, renderer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "food-1",
+        eatenType: "food",
+        position: { x: 1, z: 2 },
+      });
+
+      expect(renderer.spawnEatBurst).toHaveBeenCalledTimes(1);
+      expect(renderer.spawnEatBurst).toHaveBeenCalledWith({ x: 1, z: 2 }, expect.any(Number));
+    });
+
+    it("spawns a particle burst tinted differently per eaten bot behavior", () => {
+      const { menu, renderer } = setup();
+      menu.firePlay();
+
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "bot-1",
+        eatenType: "bot",
+        position: { x: 3, z: 4 },
+        eatenBehavior: "hunter",
+      });
+      gameLoopInstances[0]!.callbacks.onEntityEaten?.({
+        eaterId: "player",
+        eaterType: "player",
+        eatenId: "bot-2",
+        eatenType: "bot",
+        position: { x: 5, z: 6 },
+        eatenBehavior: "fleer",
+      });
+
+      expect(renderer.spawnEatBurst).toHaveBeenCalledTimes(2);
+      const [hunterColor] = (renderer.spawnEatBurst as ReturnType<typeof vi.fn>).mock.calls[0]!.slice(1);
+      const [fleerColor] = (renderer.spawnEatBurst as ReturnType<typeof vi.fn>).mock.calls[1]!.slice(1);
+      expect(hunterColor).not.toBe(fleerColor);
+    });
+
+    it("ignores eatenEvents where a bot is the eater, not the player — no SFX/burst for bot-eats-bot/food", () => {
+      const { menu, audioPlayer, renderer } = setup();
       menu.firePlay();
 
       gameLoopInstances[0]!.callbacks.onEntityEaten?.({
@@ -430,9 +483,11 @@ describe("SessionState", () => {
         eaterType: "bot",
         eatenId: "food-1",
         eatenType: "food",
+        position: { x: 5, z: 6 },
       });
 
       expect(audioPlayer.playSfx).not.toHaveBeenCalled();
+      expect(renderer.spawnEatBurst).not.toHaveBeenCalled();
     });
   });
 

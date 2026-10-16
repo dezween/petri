@@ -26,7 +26,27 @@ describe("ThreeRenderer", () => {
 
   it("render() before init() is a safe no-op", () => {
     const renderer = new ThreeRenderer();
-    expect(() => renderer.render(fakeSnapshot)).not.toThrow();
+    expect(() => renderer.render(fakeSnapshot, 1 / 60)).not.toThrow();
+  });
+
+  it("spawnEatBurst() before init() is a safe no-op (the particle system needs no WebGL context)", () => {
+    const renderer = new ThreeRenderer();
+    expect(() => renderer.spawnEatBurst({ x: 0, z: 0 }, 0xff00ff)).not.toThrow();
+  });
+
+  it("spawnEatBurst() adds live particles that render() ages out over time", () => {
+    const renderer = new ThreeRenderer();
+    const particleSystem = (renderer as unknown as { particleSystem: { activeCount: number } })
+      .particleSystem;
+    expect(particleSystem.activeCount).toBe(0);
+
+    renderer.spawnEatBurst({ x: 10, z: -10 }, 0x66bf8c);
+    expect(particleSystem.activeCount).toBeGreaterThan(0);
+
+    // render() before init() returns early (no `this.renderer`) and must NOT age particles —
+    // only a real frame should advance the particle clock.
+    renderer.render(fakeSnapshot, 1);
+    expect(particleSystem.activeCount).toBeGreaterThan(0);
   });
 
   it("resize() before init() is a safe no-op", () => {
@@ -97,5 +117,23 @@ describe("ThreeRenderer", () => {
     expect(floorMaterialDispose).toHaveBeenCalledOnce();
     expect(rimGeometryDispose).toHaveBeenCalledOnce();
     expect(rimMaterialDispose).toHaveBeenCalledOnce();
+  });
+
+  it("dispose() releases the particle system's geometry/material too, not just floor/rim", () => {
+    const renderer = new ThreeRenderer();
+    const scene = (renderer as unknown as { scene: THREE.Scene }).scene;
+    const particleSystem = (
+      renderer as unknown as {
+        particleSystem: { points: THREE.Points; dispose: () => void };
+      }
+    ).particleSystem;
+    const disposeSpy = vi.spyOn(particleSystem, "dispose");
+    const pointsInSceneBefore = scene.children.includes(particleSystem.points);
+
+    renderer.dispose();
+
+    expect(pointsInSceneBefore).toBe(true);
+    expect(disposeSpy).toHaveBeenCalledOnce();
+    expect(scene.children.includes(particleSystem.points)).toBe(false);
   });
 });

@@ -4,9 +4,29 @@ import type { IRenderer } from "@/render/port/renderer.port";
 import { createPlayer } from "@/world/domain/cell.entity";
 import { BotPopulationService } from "@/world/service/bot-population.service";
 import { FoodSpawnerService } from "@/world/service/food-spawner.service";
-import { DEFAULT_ARENA_WIDTH, WorldService } from "@/world/service/world.service";
+import { DEFAULT_ARENA_WIDTH, WorldService, type EatenEvent } from "@/world/service/world.service";
 import { GameLoopService } from "@/session/game-loop.service";
 import type { IHud } from "./port/hud.port";
+
+/**
+ * Particle-burst tint per eaten entity type/behavior (Epic 2, task 009) — sourced directly
+ * from each `tools/blender/generate_*.py` script's `make_material()` call (not guessed), so a
+ * burst reads as "that specific thing" rather than a single generic flash. No canonical color
+ * constant exists elsewhere in the TypeScript side of this codebase (the real colors live
+ * baked into the exported `.glb` materials) — if those scripts' colors are ever retuned
+ * (e.g. task 015's accessible-palette pass), this map should be retuned to match.
+ */
+const FOOD_BURST_COLOR = 0xf259a6;
+const BOT_BURST_COLOR_BY_BEHAVIOR: Record<string, number> = {
+  wanderer: 0x66bf8c,
+  hunter: 0xd94026,
+  fleer: 0xf2d959,
+};
+
+function burstColorFor(event: EatenEvent): number {
+  if (event.eatenType === "food") return FOOD_BURST_COLOR;
+  return (event.eatenBehavior && BOT_BURST_COLOR_BY_BEHAVIOR[event.eatenBehavior]) ?? 0xffffff;
+}
 
 export type SessionStateName = "MainMenu" | "Playing" | "GameOver" | "Victory";
 
@@ -191,13 +211,17 @@ export class SessionState {
       onPlayerEaten: () => this.enterGameOver(worldService.getSnapshot().player.mass),
       onVictoryReached: () => this.enterVictory(worldService.getSnapshot().player.mass),
       onTick: (snapshot) => hud.updateMass(snapshot.player.mass),
-      // Only the player's own eats get a sound — bot-eats-bot/food happen constantly and
-      // silently all over the arena, exactly as in Epic 1; this event stream carries all of
-      // them (see EatenEvent's doc comment) so a future particle trigger (task 009) can reuse
-      // it for bot eats too without this filter getting in its way.
+      // Only the player's own eats get a sound/burst — bot-eats-bot/food happen constantly
+      // and silently all over the arena, exactly as in Epic 1; this event stream carries all
+      // of them (see EatenEvent's doc comment), this filter just chooses not to react to the
+      // bot-caused ones (a `player.position` burst for those would be nonsensical — `position`
+      // on the event is the eaten entity's own position, not the player's, so nothing here
+      // actually depends on the player being nearby, this is purely a "don't clutter the
+      // screen with off-screen bot-vs-bot flashes" choice, task 009's documented default).
       onEntityEaten: (event) => {
         if (event.eaterType !== "player") return;
         this.deps.audioPlayer.playSfx(event.eatenType === "food" ? "eat-food" : "eat-bot");
+        this.deps.renderer.spawnEatBurst(event.position, burstColorFor(event));
       },
     });
   }
