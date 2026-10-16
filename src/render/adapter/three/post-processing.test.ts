@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RadialBlurShader } from "./post-processing";
+import { BLOOM_RADIUS, BLOOM_STRENGTH, BLOOM_THRESHOLD, RadialBlurShader } from "./post-processing";
 
 /**
  * `PostProcessingPipeline` itself can't be constructed here — like `ThreeRenderer.init()`
@@ -38,5 +38,16 @@ describe("RadialBlurShader", () => {
     expect(RadialBlurShader.vertexShader).toContain("gl_Position");
     expect(RadialBlurShader.vertexShader).toContain("vUv");
     expect(RadialBlurShader.fragmentShader).toContain("vUv");
+  });
+});
+
+describe("bloom pass parameters (task 014)", () => {
+  it("are in sane ranges: a positive strength, a normalized radius, and a normalized threshold", () => {
+    expect(BLOOM_STRENGTH).toBeGreaterThan(0);
+    // UnrealBloomPass's radius/threshold parameters are both documented as 0-1 ranges.
+    expect(BLOOM_RADIUS).toBeGreaterThanOrEqual(0);
+    expect(BLOOM_RADIUS).toBeLessThanOrEqual(1);
+    expect(BLOOM_THRESHOLD).toBeGreaterThanOrEqual(0);
+    expect(BLOOM_THRESHOLD).toBeLessThanOrEqual(1);
   });
 });

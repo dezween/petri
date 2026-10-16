@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 /**
  * Epic 2, task 013's "blur the background, keep the dish sharp" effect is NOT implemented with
@@ -80,14 +81,24 @@ export const RadialBlurShader = {
   `,
 };
 
+/** Epic 2, task 014: threshold/strength/radius for the glowing-membrane/agar look. Tuned for
+ * real in task 016's playtest — these are a reasonable starting point, not a final answer.
+ * Exported so post-processing.test.ts can sanity-check the ranges without needing to construct
+ * a real `UnrealBloomPass` (which, like the rest of `PostProcessingPipeline`, needs a live
+ * WebGL context this test environment doesn't have). */
+export const BLOOM_STRENGTH = 0.55;
+export const BLOOM_RADIUS = 0.4;
+export const BLOOM_THRESHOLD = 0.72;
+
 /**
  * Wraps an `EffectComposer` pipeline: base scene render -> radial background blur (013) ->
- * screen. Shared infrastructure for task 014 (bloom), which will add a pass to this same
- * composer rather than standing up a second, competing pipeline.
+ * bloom (014) -> screen. Shared infrastructure for both tasks, per task 013's own doc ("task
+ * 014 will reuse the same composer pipeline, so get the composer setup right here").
  */
 export class PostProcessingPipeline {
   private readonly composer: EffectComposer;
   private readonly radialBlurPass: ShaderPass;
+  private readonly bloomPass: UnrealBloomPass;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -102,6 +113,19 @@ export class PostProcessingPipeline {
     this.radialBlurPass = new ShaderPass(RadialBlurShader);
     this.radialBlurPass.uniforms.resolution.value.set(width, height);
     this.composer.addPass(this.radialBlurPass);
+
+    // Bloom pass after the blur pass: bloom picks up bright pixels from the already-blurred
+    // background too, which is the desired order (task 014's doc: "make sure bloom doesn't
+    // ... double-blur the background into mush" — bloom adds glow, it doesn't re-blur, so this
+    // ordering doesn't compound blur, it just lets bright background highlights bloom softly
+    // same as everything else).
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      BLOOM_STRENGTH,
+      BLOOM_RADIUS,
+      BLOOM_THRESHOLD,
+    );
+    this.composer.addPass(this.bloomPass);
   }
 
   render(): void {
@@ -111,6 +135,7 @@ export class PostProcessingPipeline {
   setSize(width: number, height: number): void {
     this.composer.setSize(width, height);
     this.radialBlurPass.uniforms.resolution.value.set(width, height);
+    this.bloomPass.setSize(width, height);
   }
 
   dispose(): void {
