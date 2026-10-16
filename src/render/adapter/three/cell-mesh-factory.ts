@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { ModelCache, ModelName } from "./model-loader";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import type { Bot, BotBehavior } from "@/world/domain/bot.entity";
+import { applyMembraneMaterial } from "./membrane-material";
 
 /** Upper bound on simultaneous food instances. Food count is tuned for real in task 027. */
 const MAX_FOOD_INSTANCES = 400;
@@ -245,6 +246,10 @@ export class CellMeshFactory {
   constructor(models: ModelCache) {
     if (models.player_cell) {
       this.playerMesh = buildStaticObject(models.player_cell);
+      // Epic 3, task 005: swap the membrane's flat alpha-blended material for a glassy/fresnel
+      // one. Safe to call on any object — it only touches a mesh named "MembraneMat" and is a
+      // no-op otherwise, so buildStaticObject itself stays shared/non-player-specific.
+      applyMembraneMaterial(this.playerMesh);
       this.group.add(this.playerMesh);
     }
 
