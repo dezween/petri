@@ -18,9 +18,9 @@ import type { IHud } from "./port/hud.port";
  */
 const FOOD_BURST_COLOR = 0xf259a6;
 const BOT_BURST_COLOR_BY_BEHAVIOR: Record<string, number> = {
-  wanderer: 0x66bf8c,
-  hunter: 0xd94026,
-  fleer: 0xf2d959,
+  wanderer: 0x4073d9, // generate_bot_wanderer.py make_material (0.25, 0.45, 0.85) — task 015 palette
+  hunter: 0xe64d14, // generate_bot_hunter.py make_material (0.90, 0.30, 0.08) — task 015 palette
+  fleer: 0xe0e69e, // generate_bot_fleer.py make_material (0.88, 0.90, 0.62) — task 015 palette
 };
 
 function burstColorFor(event: EatenEvent): number {

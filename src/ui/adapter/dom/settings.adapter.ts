@@ -44,8 +44,21 @@ export function loadAudioSettings(storage: Pick<Storage, "getItem">): AudioSetti
   }
 }
 
+/**
+ * Mirrors `loadAudioSettings()`'s defensive style: best-effort persistence only. A
+ * quota-exceeded write (Safari private browsing historically throws on `setItem` even though
+ * `getItem` succeeds) or a disabled/unavailable `localStorage` must not throw out of this
+ * function — it's called directly from a live DOM `input`/`change` listener on every
+ * slider/checkbox change, and the live audio change (`applyAudioSettings`, called first) must
+ * still take effect even if persistence fails this time.
+ */
 export function saveAudioSettings(storage: Pick<Storage, "setItem">, settings: AudioSettings): void {
-  storage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Best-effort persistence — a quota-exceeded or disabled localStorage must not break the
+    // live audio control it's attached to (settings just won't survive a reload this session).
+  }
 }
 
 /** Pushes settings into a live `IAudioPlayer` — called both at startup (before any sound

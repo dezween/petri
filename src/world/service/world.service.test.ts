@@ -170,6 +170,37 @@ describe("WorldService.tick — collisions", () => {
     expect(orderAB.result.playerEaten).toBe(orderBA.result.playerEaten);
   });
 
+  it("resolves a simultaneous multi-entity overlap with identical final mass and eaten-events, independent of array order (WR-01 regression)", () => {
+    // Same setup as above, but this asserts the OUTCOME (final player mass, eaten-events),
+    // not just the playerEaten boolean. Before the fix, bots = [smaller, bigger] let the
+    // player eat `smaller` (growing mass, firing an eat-bot event) before dying to `bigger`,
+    // while bots = [bigger, smaller] killed the player immediately with neither — same
+    // boolean, different mass/events, purely from this.bots' iteration order.
+    const run = (bots: Bot[]) => {
+      const player = makePlayer({ mass: 10, position: { x: 0, z: 0 } });
+      const world = new WorldService(player, bots, []);
+      const result = world.tick(1 / 60, { x: 0, z: 0 });
+      return { result, snapshot: world.getSnapshot() };
+    };
+
+    const smaller = () => makeBot({ id: "smaller", mass: 8, position: { x: 0, z: 0 } });
+    const bigger = () => makeBot({ id: "bigger", mass: 15, position: { x: 0, z: 0 } });
+
+    const orderAB = run([smaller(), bigger()]);
+    const orderBA = run([bigger(), smaller()]);
+
+    expect(orderAB.result.playerEaten).toBe(true);
+    expect(orderBA.result.playerEaten).toBe(true);
+    // Final mass must match regardless of order — no growth should be applied in either case
+    // since the player died this tick.
+    expect(orderAB.snapshot.player.mass).toBe(10);
+    expect(orderBA.snapshot.player.mass).toBe(10);
+    expect(orderAB.snapshot.player.mass).toBe(orderBA.snapshot.player.mass);
+    // No eat-bot event should fire in either order when the player dies the same tick.
+    expect(orderAB.result.eatenEvents).toHaveLength(0);
+    expect(orderBA.result.eatenEvents).toHaveLength(0);
+  });
+
   it("caps a bot's radius at the victory-cap fraction, instead of letting it grow past the arena and snap to center", () => {
     const player = makePlayer({ position: { x: 500, z: 500 } }); // far away, uninvolved
     // Bot already near the cap; eating one more large bot should clamp its radius rather
@@ -185,6 +216,55 @@ describe("WorldService.tick — collisions", () => {
     const snapshot = world.getSnapshot();
     expect(snapshot.bots).toHaveLength(1);
     expect(snapshot.bots[0]!.radius).toBeLessThanOrEqual(cap);
+  });
+
+  it("does not tunnel two closing near-minimum-mass bots through each other during a stalled frame (WR-03 regression)", () => {
+    // The one realistic pairing in this game's actual numbers where a single end-of-tick
+    // position check can miss a collision: two bots near INITIAL_BOT_MASS (5, the smallest
+    // mass any live bot has) closing head-on. Each has speed BOT_BASE_SPEED / sqrt(5) ≈ 447.2
+    // units/sec, so closing speed ≈ 894.4 units/sec; combined radius
+    // massToRadius(5) * 2 ≈ 35.8. Starting 45 units apart (just outside combined radius) and
+    // ticking once at MAX_DELTA_TIME (0.1s, the worst a real stall is ever simulated as): a
+    // single un-split 0.1s move would send each bot its own full 44.7-unit distance toward the
+    // other, ending ~44.4 units apart on the *opposite* sides from where they started — still
+    // outside combined radius, a clean miss, despite having swapped positions and so
+    // necessarily crossed paths somewhere in between. Substepping (this file's
+    // MAX_SUBSTEP_DELTA_TIME) must catch the crossing instead.
+    //
+    // `hunter` chases `prey` directly (prey's mass is a hair under hunter's, to satisfy
+    // resolveEating's strict "<" prey filter while staying numerically indistinguishable from
+    // the real worst case of two equal-mass-5 bots). `prey` is a plain wanderer pulled toward
+    // `lure`, a food pellet placed beyond `hunter`'s position — its direction is therefore
+    // straight at (and through) `hunter`, giving a true head-on closing pair without either
+    // bot's direction depending on the other.
+    const hunterMass = 5;
+    const preyMass = 4.999;
+    const hunter = makeBot({
+      id: "hunter",
+      mass: hunterMass,
+      radius: massToRadius(hunterMass),
+      behavior: "hunter",
+      position: { x: -22.5, z: 0 },
+    });
+    const prey = makeBot({
+      id: "prey",
+      mass: preyMass,
+      radius: massToRadius(preyMass),
+      behavior: "wanderer",
+      position: { x: 22.5, z: 0 },
+    });
+    const lure = makeFood({ id: "lure", position: { x: -120, z: 0 } });
+    const player = makePlayer({ position: { x: 5000, z: 5000 } }); // far away, uninvolved
+    const world = new WorldService(player, [hunter, prey], [lure]);
+
+    world.tick(0.1, { x: 0, z: 0 });
+
+    const snapshot = world.getSnapshot();
+    // `prey` must have actually been caught (eaten by `hunter`), not passed through
+    // undetected — the direct symptom of the tunneling bug this substep fix addresses.
+    expect(snapshot.bots.map((bot) => bot.id)).not.toContain("prey");
+    expect(snapshot.bots).toHaveLength(1);
+    expect(snapshot.bots[0]!.id).toBe("hunter");
   });
 });
 
