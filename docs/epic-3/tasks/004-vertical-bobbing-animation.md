@@ -24,9 +24,14 @@ it's the next-highest-impact, still-contained change per SPEC.md's prioritizatio
   into `CellMeshFactory.updateFromSnapshot` (or accumulate it in `ThreeRenderer` and pass the
   running total down) — follow whichever of those two shapes is more consistent with how
   `ParticleSystem` already does it, don't invent a third pattern.
-- Per-entity phase offset: derive a stable value from something already unique per entity (e.g.
-  hash the food/bot's `id` string, or use its spawn position) — must be stable across frames for
-  the same entity (don't re-roll it every frame, that would look like jitter, not a bob) and
+- Per-entity phase offset: derive a stable value by hashing the food/bot's `id` string (e.g.
+  `food-${n}` / `bot-${n}` per `food-spawner.service.ts`/`bot-population.service.ts`) — this is
+  the one approach actually grounded in existing domain data. (A "use its spawn position"
+  alternative was considered and dropped: `Cell`/`Food`'s `position` field is mutated every tick
+  as the entity moves, there's no tracked spawn-time position anywhere in the domain layer, so
+  that would require adding new state-tracking this task doesn't scope — the `id`-hash is
+  already fully supported by existing data and simpler.) Must be stable across frames for the
+  same entity (don't re-roll it every frame, that would look like jitter, not a bob) and
   different enough between entities that they visibly don't all bob in unison. The player, being
   singular, doesn't need phase variation — only food/bots (multiple same-type entities bobbing
   in lockstep is the specific thing this requirement avoids).

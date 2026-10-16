@@ -52,6 +52,9 @@ src/render/adapter/three/
   membrane-material.ts    # NEW — builds the player membrane's fresnel/glass material,
                           # applied as a post-load swap onto the loaded glTF material (see
                           # task 005)
+  post-processing.ts       # possibly retuned (not logic-changed) — task 001's tilt breaks
+                          # the radial-blur's straight-down-camera assumption; task 006
+                          # re-verifies and retunes innerRadius/outerRadius if needed
 
 tools/blender/
   (no changes — the membrane's base color/alpha stays Blender-authored; the fresnel look is
@@ -98,9 +101,14 @@ actually looking at the result, not just trusting this math.
 - The existing `DirectionalLight` (`lighting.ts`) becomes the shadow-casting light:
   `light.castShadow = true`, with its `shadow.camera` (an orthographic shadow frustum, since
   it's a directional light) sized to cover the arena at its largest configured width (2000, per
-  Epic 2's Large size) rather than a fixed guess — reuse the same kind of worst-case sizing
-  reasoning `scene.ts`'s `BENCH_RADIUS` comment already documents for a similar problem, don't
-  recompute it from scratch with different assumptions.
+  Epic 2's Large size) rather than a fixed guess. This sizing is based directly on the arena's
+  own fixed world-space footprint (radius 1000, plus margin) — not `scene.ts`'s `BENCH_RADIUS`
+  (6000), which is a camera-viewport worst-case unrelated to what a shadow frustum needs to
+  cover; reusing it would make shadows needlessly blockier. The shadow camera's `near`/`far`
+  clipping planes also need explicit attention, not just the frustum's width/height: the light's
+  current position (`100, 300, 150`, target defaulting to the origin) puts much of the Large
+  arena outside Three.js's default `near`/`far` (`0.5`/`500`) along the light's view axis —
+  task 002 works out the real numbers and the corrected light position/near/far needed.
 - Starting shadow map resolution: **2048×2048** — large enough to avoid obviously blocky shadow
   edges on a mostly-empty pale floor, not so large it's a measurable frame-time cost for a
   single directional light. Tuned for real in task 006 if it turns out too soft/blocky/slow.
@@ -129,10 +137,11 @@ actually looking at the result, not just trusting this math.
 - Starting frequency: **~0.5-1 Hz** (a slow, calm bob — this is a petri dish, not a trampoline).
 - **Per-entity phase offset is required**, not optional: if every entity bobs perfectly in sync
   it reads as one mechanical animation applied to a flat scene, defeating the point. Derive a
-  stable per-entity phase from something already unique per entity (e.g. a hash of the food/bot
-  array index, or — simpler and already available — each entity's world-space spawn position)
-  rather than `Math.random()` at render time, so a given entity's bob phase doesn't visibly jump
-  between frames.
+  stable per-entity phase by hashing the food/bot's stable `id` string (already unique and
+  available per entity; there's no tracked spawn-position in the domain layer — `position` is
+  mutated every tick — so that alternative isn't implementable without new state) rather than
+  `Math.random()` at render time, so a given entity's bob phase doesn't visibly jump between
+  frames.
 - This needs a running clock. `ThreeRenderer.render(snapshot, deltaTime)` already receives
   `deltaTime` every frame (added for Epic 2's particle system) — accumulate it into an elapsed-
   time value inside `CellMeshFactory` (or wherever the bobbing math lives) rather than adding a

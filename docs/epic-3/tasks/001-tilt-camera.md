@@ -34,6 +34,15 @@ function is).
   re-verify this is actually true once tilted, don't just assume orthogonality holds.
 - Make the elevation angle a named, documented constant (e.g. `CAMERA_ELEVATION_DEGREES`) so
   task 006's balance pass can tune it without re-deriving the trig.
+- **Note for task 006**: `src/render/adapter/three/post-processing.ts`'s radial-blur effect is
+  documented as assuming the camera looks straight down (every entity sits at roughly the same
+  camera-space depth, and "near the screen center" correlates with "near the dish center"
+  specifically because of that straight-down assumption). Tilting the camera here breaks that
+  assumption — the circular arena floor no longer projects as a screen-centered circle once
+  tilted, so the blur ring's `innerRadius`/`outerRadius` falloff may no longer line up
+  symmetrically with the dish edge. This task does not need to fix `post-processing.ts` itself
+  (out of this task's scope — it doesn't touch camera geometry), but task 006's regression pass
+  must re-verify/retune it under the new tilt (see task 006's checklist).
 
 ## Files touched
 

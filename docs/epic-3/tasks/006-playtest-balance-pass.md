@@ -39,6 +39,11 @@ Depends on 001-005 (everything there is to tune must exist first).
   flow, particle bursts, audio, settings screen, all three arena sizes — a visual-only epic
   touching the one class every other render path flows through (`ThreeRenderer`) is exactly the
   kind of change that can silently break something unrelated.
+  - **Specifically**: re-verify the background radial-blur/bloom pipeline
+    (`post-processing.ts`) still reads correctly (dish stays sharp, periphery still blurs) under
+    the tilted camera from task 001 — its `innerRadius`/`outerRadius` falloff was tuned assuming
+    a straight-down camera and may no longer line up symmetrically with the dish edge now that
+    the arena floor foreshortens under the tilt. Retune those constants if needed.
 - Clean up any temporary test scripts/installed-but-not-saved packages (e.g. `playwright` via
   `npm install --no-save`) afterward, per this project's established practice.
 
