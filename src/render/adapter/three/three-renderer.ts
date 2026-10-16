@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { IRenderer } from "@/render/port/renderer.port";
 import type { WorldSnapshot } from "@/world/service/world.service";
 import { DEFAULT_ARENA_WIDTH } from "@/world/service/world.service";
-import { createScene } from "./scene";
+import { buildArenaFloorAndRim, createScene } from "./scene";
 import { addLighting } from "./lighting";
 import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
@@ -67,6 +67,22 @@ export class ThreeRenderer implements IRenderer {
   }
 
   /**
+   * Rebuilds just the floor/rim in place at a new arena width (Epic 2, task 001) — the
+   * lighting, camera, and entity-mesh group are independent of arenaWidth and stay untouched.
+   * Reuses the same named-mesh disposal `dispose()` relies on, so the old floor/rim's GPU
+   * resources never leak across a resize the way they would with a naive "just add a new one"
+   * approach.
+   */
+  setArenaWidth(width: number): void {
+    this.disposeNamedMesh("arena-floor");
+    this.disposeNamedMesh("arena-rim");
+
+    const { floor, rim } = buildArenaFloorAndRim(width);
+    this.scene.add(floor);
+    this.scene.add(rim);
+  }
+
+  /**
    * Intentionally unreachable in the current wiring (this app never tears down its one
    * long-lived instance) — kept alive by this class's own tests only, until the app gains a
    * real teardown path (HMR support, embeddable widget use case, etc.). Not dead code to
@@ -83,20 +99,25 @@ export class ThreeRenderer implements IRenderer {
     // createScene() (constructor) allocates the static floor/rim geometry+materials, which
     // THREE.WebGLRenderer.dispose() does NOT free for you — it only disposes renderer-internal
     // state (render lists, program cache, etc.), never the scene graph's own GPU resources.
-    for (const name of ["arena-floor", "arena-rim"]) {
-      const obj = this.scene.getObjectByName(name);
-      if (obj instanceof THREE.Mesh) {
-        obj.geometry.dispose();
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const m of mats) m.dispose();
-      }
-    }
+    this.disposeNamedMesh("arena-floor");
+    this.disposeNamedMesh("arena-rim");
+
     if (this.renderer && this.container) {
       this.container.removeChild(this.renderer.domElement);
     }
     this.renderer?.dispose();
     this.renderer = undefined;
     this.container = undefined;
+  }
+
+  /** Removes a named mesh from the scene and releases its geometry/material(s), if present. Shared by `dispose()` and `setArenaWidth()` so the "find by name, remove, dispose geometry+material(s)" sequence is defined once. */
+  private disposeNamedMesh(name: string): void {
+    const obj = this.scene.getObjectByName(name);
+    if (!(obj instanceof THREE.Mesh)) return;
+    this.scene.remove(obj);
+    obj.geometry.dispose();
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const m of mats) m.dispose();
   }
 }
 

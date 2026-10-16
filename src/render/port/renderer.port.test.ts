@@ -6,6 +6,7 @@ import type { WorldSnapshot } from "@/world/service/world.service";
 class NoOpRenderer implements IRenderer {
   initCalls = 0;
   renderCalls = 0;
+  setArenaWidthCalls = 0;
 
   init(_container: HTMLElement): void {
     this.initCalls++;
@@ -16,6 +17,10 @@ class NoOpRenderer implements IRenderer {
   }
 
   resize(_width: number, _height: number): void {}
+
+  setArenaWidth(_width: number): void {
+    this.setArenaWidthCalls++;
+  }
 
   dispose(): void {}
 }
@@ -33,9 +38,11 @@ describe("IRenderer", () => {
     renderer.init({} as HTMLElement);
     renderer.render(fakeSnapshot);
     renderer.resize(800, 600);
+    renderer.setArenaWidth(1500);
     renderer.dispose();
 
     expect(renderer.initCalls).toBe(1);
     expect(renderer.renderCalls).toBe(1);
+    expect(renderer.setArenaWidthCalls).toBe(1);
   });
 });
