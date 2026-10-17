@@ -14,4 +14,8 @@ export interface PositionedMass {
    * consumer written before this field existed degrades gracefully to current-position-only
    * steering. */
   velocity?: Vector2;
+  /** Epic 4, task 009: set only for entries that are actually bots, so hunter.ts's soft
+   * pack-awareness can tell "another hunter" apart from food/player/other behaviors without a
+   * second lookup. Undefined for food and the player. */
+  botBehavior?: "wanderer" | "hunter" | "fleer";
 }
