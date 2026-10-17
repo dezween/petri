@@ -41,6 +41,14 @@ const PLACEMENTS: PropPlacement[] = [
   { model: "prop_droplet", angle: Math.atan2(1065, 746), offsetFromRim: 300, rotationY: 0, scale: 55 },
   { model: "prop_droplet", angle: Math.atan2(550, 1178), offsetFromRim: 300, rotationY: 0, scale: 48 },
   { model: "prop_droplet", angle: Math.atan2(-1222, 445), offsetFromRim: 300, rotationY: 0, scale: 60 },
+  // User request: one big, highly detailed piece framing the dish — a microscope, positioned
+  // "north" (world +z, the far side from the camera's south-offset tilt — see camera.ts) so it
+  // reads as backdrop framing at the top of the frame rather than sitting in front of the
+  // gameplay view. offsetFromRim is deliberately smaller than the small props' 300 (and scale
+  // much bigger) so its stage visually reaches toward the dish instead of floating far off.
+  // rotationY=PI/2 turns the model's local +x (where the stage/turret sit) to face world -z,
+  // i.e. back toward the dish at the origin.
+  { model: "prop_microscope", angle: Math.PI / 2, offsetFromRim: 300, rotationY: Math.PI / 2, scale: 110 },
 ];
 
 /**

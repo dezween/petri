@@ -17,7 +17,7 @@ const MAX_BOTS_PER_BEHAVIOR = 60;
  * subset keeps that distinction a type error, not just a convention: a prop name passed to
  * `radiusToScale` wouldn't have a meaningful "mass radius" to divide by.
  */
-type EntityModelName = Exclude<ModelName, "prop_empty_dish" | "prop_pipette" | "prop_droplet">;
+type EntityModelName = Exclude<ModelName, "prop_empty_dish" | "prop_pipette" | "prop_droplet" | "prop_microscope">;
 
 /**
  * Each model's "radius" in its own local units, as built by its `tools/blender/generate_*.py`

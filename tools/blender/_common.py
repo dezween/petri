@@ -22,19 +22,25 @@ def clear_scene():
         bpy.data.materials.remove(mat)
 
 
-def make_material(name, color, alpha=1.0, roughness=0.4):
-    """Create a simple Principled-BSDF material, optionally translucent.
+def make_material(name, color, alpha=1.0, roughness=0.4, metallic=0.0):
+    """Create a simple Principled-BSDF material, optionally translucent/metallic.
 
     When ``alpha < 1.0`` the material is switched to alpha-blended so the
     glTF exporter emits ``alphaMode: "BLEND"`` and folds the alpha value
     into ``baseColorFactor`` (verified against the Blender 5.2 glTF
     exporter -- see docs/REVIEW.md WR-04).
+
+    ``metallic`` (0.0-1.0, default 0.0 so every existing caller is
+    unaffected) maps straight to the Principled BSDF's own Metallic input
+    and exports as glTF's standard `metallicFactor` -- used for the
+    chrome/polished-metal trim on the microscope prop.
     """
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (*color, 1.0)
     bsdf.inputs["Roughness"].default_value = roughness
+    bsdf.inputs["Metallic"].default_value = metallic
     if alpha < 1.0:
         bsdf.inputs["Alpha"].default_value = alpha
         mat.blend_method = 'BLEND'
