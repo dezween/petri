@@ -99,6 +99,13 @@ export class WorldService {
   private bots: Bot[];
   private food: Food[];
   private readonly arenaWidth: number;
+  /** Epic 4, task 002: (position-delta / deltaTime) for player + every bot, rebuilt from
+   * scratch at the end of every `tick()` scoped to whatever's currently alive — never a
+   * persistent/accumulating map, so despawned entities simply aren't in it next tick, no
+   * pruning needed. Food is never in here (it never moves); `toPositionedMass` already
+   * defaults to `{0,0}` for any id with no entry, which covers both food and "no prior tick
+   * yet" freshly-spawned entities identically. */
+  private lastTickVelocities = new Map<string, Vector2>();
 
   constructor(
     player: Player,
@@ -124,6 +131,12 @@ export class WorldService {
     const substepDelta = deltaTime / substeps;
     const eatenEvents: EatenEvent[] = [];
     let playerEaten = false;
+
+    // Epic 4, task 002: snapshot start-of-tick positions so velocity = (end - start) / deltaTime
+    // can be derived after movement below, with zero persistent cross-tick state to prune.
+    const startPositions = new Map<string, Vector2>();
+    startPositions.set(this.player.id, { ...this.player.position });
+    for (const bot of this.bots) startPositions.set(bot.id, { ...bot.position });
 
     for (let i = 0; i < substeps; i++) {
       this.movePlayer(substepDelta, playerInputDirection);
@@ -167,7 +180,27 @@ export class WorldService {
       if (spawned.length > 0) this.food.push(...spawned);
     }
 
+    // Epic 4, task 002: derive this tick's velocities for whoever's still alive and had a
+    // start-of-tick position (an entity spawned mid-tick by the services above has none —
+    // `computeVelocity` reports {0,0} for it, exactly the "no prior tick yet" case).
+    const computeVelocity = (id: string, endPosition: Vector2): Vector2 => {
+      const start = startPositions.get(id);
+      if (!start || deltaTime === 0) return { x: 0, z: 0 };
+      return { x: (endPosition.x - start.x) / deltaTime, z: (endPosition.z - start.z) / deltaTime };
+    };
+    const nextVelocities = new Map<string, Vector2>();
+    nextVelocities.set(this.player.id, computeVelocity(this.player.id, this.player.position));
+    for (const bot of this.bots) nextVelocities.set(bot.id, computeVelocity(bot.id, bot.position));
+    this.lastTickVelocities = nextVelocities;
+
     return { playerEaten, victoryReached, eatenEvents };
+  }
+
+  /** Epic 4, task 002: exposed for testing the velocity-tracking math directly, independent
+   * of any particular bot-ai consumer. Returns `{0,0}` for food, for anything without a
+   * tracked prior-tick position yet, and for any unknown id. */
+  getVelocityFor(id: string): Vector2 {
+    return this.lastTickVelocities.get(id) ?? { x: 0, z: 0 };
   }
 
   getSnapshot(): WorldSnapshot {
@@ -191,19 +224,38 @@ export class WorldService {
   }
 
   private computeBotDirection(bot: Bot, deltaTime: number): Vector2 {
+    const arenaRadius = this.arenaWidth / 2;
     switch (bot.behavior) {
       case "wanderer":
-        return wandererMove(bot, this.food, deltaTime);
+        return wandererMove(bot, this.foodAsPositionedMass(), deltaTime, arenaRadius);
       case "hunter":
-        return hunterMove(bot, this.othersFor(bot), deltaTime);
+        return hunterMove(bot, this.othersFor(bot), deltaTime, arenaRadius);
       case "fleer":
-        return fleerMove(bot, this.othersFor(bot), deltaTime);
+        return fleerMove(bot, this.othersFor(bot), deltaTime, arenaRadius);
     }
   }
 
-  /** Player + every other bot + all food, as the generic PositionedMass shape bot AI steers against. */
+  /** Player + every other bot + all food, as the generic PositionedMass shape bot AI steers
+   * against — each carries `velocity` (Epic 4, task 002) from `this.lastTickPositions`. */
   private othersFor(bot: Bot): PositionedMass[] {
-    return [this.player, ...this.bots.filter((b) => b.id !== bot.id), ...this.food];
+    return [
+      this.toPositionedMass(this.player),
+      ...this.bots.filter((b) => b.id !== bot.id).map((b) => this.toPositionedMass(b)),
+      ...this.foodAsPositionedMass(),
+    ];
+  }
+
+  private foodAsPositionedMass(): PositionedMass[] {
+    return this.food.map((f) => this.toPositionedMass(f));
+  }
+
+  private toPositionedMass(entity: Cell): PositionedMass {
+    return {
+      id: entity.id,
+      position: entity.position,
+      mass: entity.mass,
+      velocity: this.lastTickVelocities.get(entity.id) ?? { x: 0, z: 0 },
+    };
   }
 
   /** Speed decreases as mass grows — simple inverse-sqrt relationship. Not revisited during the 027 balance pass — still a rough guess, revisit if real playtesting suggests otherwise. Shared by player and bot movement so both scale the same way. */

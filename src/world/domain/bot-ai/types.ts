@@ -9,4 +9,9 @@ export interface PositionedMass {
   id: string;
   position: Vector2;
   mass: number;
+  /** Epic 4, task 002: this entity's velocity as of the current tick, `{0,0}` for anything
+   * stationary (food) or without a prior-tick position yet (freshly spawned). Optional so any
+   * consumer written before this field existed degrades gracefully to current-position-only
+   * steering. */
+  velocity?: Vector2;
 }
