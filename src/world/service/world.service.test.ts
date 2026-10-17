@@ -401,3 +401,58 @@ describe("WorldService.getSnapshot", () => {
     expect(second.bots[0]!.position.x).toBe(2);
   });
 });
+
+describe("WorldService — velocity tracking (Epic 4, task 002)", () => {
+  it("a moving entity's tracked velocity matches its actual measured displacement over that tick", () => {
+    const player = makePlayer({ position: { x: 0, z: 0 } });
+    const world = new WorldService(player, [], [], DEFAULT_ARENA_WIDTH);
+    const dt = 1 / 60;
+
+    world.tick(dt, { x: 1, z: 0 });
+
+    const endX = world.getSnapshot().player.position.x;
+    const velocity = world.getVelocityFor("player");
+
+    expect(endX).toBeGreaterThan(0);
+    expect(velocity.x).toBeCloseTo(endX / dt, 5);
+    expect(velocity.z).toBeCloseTo(0, 5);
+  });
+
+  it("an id with no tracked prior-tick position reports {0,0}, not a crash or garbage value", () => {
+    const world = new WorldService(makePlayer(), [], [], DEFAULT_ARENA_WIDTH);
+    world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(world.getVelocityFor("never-existed")).toEqual({ x: 0, z: 0 });
+  });
+
+  it("the very first tick (deltaTime 0) never divides by zero", () => {
+    const world = new WorldService(makePlayer(), [], [], DEFAULT_ARENA_WIDTH);
+
+    expect(() => world.tick(0, { x: 1, z: 0 })).not.toThrow();
+
+    const velocity = world.getVelocityFor("player");
+    expect(Number.isFinite(velocity.x)).toBe(true);
+    expect(Number.isFinite(velocity.z)).toBe(true);
+  });
+
+  it("a despawned entity's velocity is not retained — the tracking map is rebuilt per-tick from whoever's currently alive, not accumulated", () => {
+    const player = makePlayer({ mass: 1_000_000 }); // always wins any overlap this test sets up
+    const bot = makeBot({ id: "doomed", position: { x: 0, z: 0 }, mass: 1 });
+    const world = new WorldService(player, [bot], [], DEFAULT_ARENA_WIDTH);
+
+    world.tick(1 / 60, { x: 0, z: 0 }); // player overlaps and eats "doomed" this tick
+
+    expect(world.getSnapshot().bots.find((b) => b.id === "doomed")).toBeUndefined();
+    expect(world.getVelocityFor("doomed")).toEqual({ x: 0, z: 0 });
+  });
+
+  it("food always reports {0,0} velocity (it never moves)", () => {
+    const player = makePlayer({ position: { x: 1000, z: 1000 } }); // far away, never interacts
+    const food = makeFood({ id: "f1" });
+    const world = new WorldService(player, [], [food], DEFAULT_ARENA_WIDTH);
+
+    world.tick(1 / 60, { x: 0, z: 0 });
+
+    expect(world.getVelocityFor("f1")).toEqual({ x: 0, z: 0 });
+  });
+});
