@@ -18,6 +18,17 @@ depth instead of a flat top-down view; soft real-time shadows under every cell a
 gentle vertical bobbing float on food and bots; and a glassy fresnel rim-light on the player
 cell's membrane.
 
+Epic 4 adds smarter bots: a unified per-tick threat/opportunity evaluation replaces the old
+rigid wanderer/hunter/fleer dispatch, with arena-relative detection radii and a center-biased
+patrol so hunters actively search instead of idling; movement prediction so chasing/fleeing
+leads a moving target instead of trailing its stale position; multi-threat-aware and
+panic-escalating fleeing (a fleer weighs every nearby threat, not just the nearest, and speeds
+up when one closes in); dead-end awareness so a cornered bot runs along the arena rim instead
+of stalling; target persistence with a give-up timeout so hunters commit to a chase briefly but
+abandon one that isn't working; soft pack awareness so two hunters converging on the same prey
+tend to approach from different angles; and utility-based food-vs-prey target selection. See
+[`docs/epic-4/SPEC.md`](docs/epic-4/SPEC.md) for the full design spec.
+
 ## Run it
 
 ```bash
