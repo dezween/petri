@@ -11,7 +11,11 @@ export interface SteeringWeights {
 
 /** Epic 4, task 003: how far ahead (seconds) a target's velocity is extrapolated before
  * steering toward/away from it, so chasing/fleeing leads a moving target instead of chasing
- * its stale current position. SPEC.md's starting value — tuned for real in the balance pass. */
+ * its stale current position. Confirmed in task 011's balance pass: a real Playwright session
+ * (large arena, 35s, player mass 25->55, zero console errors) showed hunters consistently
+ * closing distance on the player rather than trailing a fixed offset behind, and a careless
+ * dash into a corner on the small arena got the player caught and eaten within ~14s — both
+ * consistent with 0.5s lead producing a believable, not-trivially-escapable chase. Left as-is. */
 export const PREDICTION_LOOKAHEAD_SECONDS = 0.5;
 
 /** Predicted position after `PREDICTION_LOOKAHEAD_SECONDS`, or the entity's current position
