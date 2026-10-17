@@ -9,7 +9,8 @@ export type ModelName =
   | "food"
   | "prop_empty_dish"
   | "prop_pipette"
-  | "prop_droplet";
+  | "prop_droplet"
+  | "prop_microscope";
 
 /**
  * Loaded model scenes, keyed by name — no stringly-typed lookups scattered through callers.
@@ -39,6 +40,9 @@ const MODEL_URLS: Record<ModelName, URL> = {
   prop_empty_dish: new URL("../../../assets/models/prop_empty_dish.glb", import.meta.url),
   prop_pipette: new URL("../../../assets/models/prop_pipette.glb", import.meta.url),
   prop_droplet: new URL("../../../assets/models/prop_droplet.glb", import.meta.url),
+  // One big detailed static piece (user request) framing the dish from one side — same
+  // static/non-instanced treatment as the other three props, just a lot more geometry.
+  prop_microscope: new URL("../../../assets/models/prop_microscope.glb", import.meta.url),
 };
 
 const MODEL_FILES: Record<ModelName, string> = {
@@ -50,6 +54,7 @@ const MODEL_FILES: Record<ModelName, string> = {
   prop_empty_dish: "prop_empty_dish.glb",
   prop_pipette: "prop_pipette.glb",
   prop_droplet: "prop_droplet.glb",
+  prop_microscope: "prop_microscope.glb",
 };
 
 /**
