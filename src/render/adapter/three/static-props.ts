@@ -48,7 +48,7 @@ const PLACEMENTS: PropPlacement[] = [
   // much bigger) so its stage visually reaches toward the dish instead of floating far off.
   // rotationY=PI/2 turns the model's local +x (where the stage/turret sit) to face world -z,
   // i.e. back toward the dish at the origin.
-  { model: "prop_microscope", angle: Math.PI / 2, offsetFromRim: 180, rotationY: Math.PI / 2, scale: 140 },
+  { model: "prop_microscope", angle: Math.PI / 2, offsetFromRim: 300, rotationY: Math.PI / 2, scale: 110 },
 ];
 
 /**

@@ -35,13 +35,13 @@ def main():
         return obj
 
     # --- Base: a wide, slightly tapered foot the whole instrument stands on ---
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=1.6, depth=0.35, location=(0, 0.18, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=1.15, depth=0.35, location=(0, 0.18, 0))
     base = add(bpy.context.active_object, body_mat, "Microscope_Base")
     base.scale = (1.0, 1.0, 0.62)  # oval footprint, not a perfect circle
 
     # Chrome trim ring around the base's upper edge
     bpy.ops.mesh.primitive_torus_add(
-        major_radius=1.55, minor_radius=0.05, major_segments=32, minor_segments=8,
+        major_radius=1.1, minor_radius=0.05, major_segments=32, minor_segments=8,
         location=(0, 0.34, 0), rotation=(math.radians(90), 0, 0),
     )
     base_trim = add(bpy.context.active_object, chrome_mat, "Microscope_BaseTrim")
@@ -60,7 +60,7 @@ def main():
         # microscope's classic C-arm silhouette.
         x = arm_base_x + math.sin(t * math.pi * 0.55) * 1.35
         y = 0.35 + t * arm_height
-        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.26 - 0.07 * t, depth=arm_height / arm_segment_count * 1.25, location=(x, y, 0))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.32 - 0.08 * t, depth=arm_height / arm_segment_count * 1.25, location=(x, y, 0))
         seg = add(bpy.context.active_object, body_mat, f"Microscope_Arm_{i}")
         # Tilt each segment slightly to follow the curve's local tangent.
         seg.rotation_euler.z = -t * math.radians(28)
@@ -122,7 +122,7 @@ def main():
     # this is the piece that visually reads as "the dish is sitting on the microscope's
     # stage" even though the actual gameplay dish is a separate object elsewhere in the
     # scene — the plate just needs to gesture toward it. ---
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=2.3, depth=0.1, location=(0.6, 0.42, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=1.5, depth=0.1, location=(0.6, 0.42, 0))
     stage = add(bpy.context.active_object, chrome_mat, "Microscope_Stage")
     stage.scale = (1.3, 1.0, 1.3)
 
