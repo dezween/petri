@@ -3,8 +3,8 @@
 Numbered checklist index. See `SPEC.md` for full design decisions. Nothing in this epic is
 implemented yet — all tasks below are planning only.
 
-- [ ] [001 — Unified per-tick threat/opportunity evaluation core](tasks/001-unified-evaluation-core.md)
-- [ ] [002 — Velocity tracking infrastructure](tasks/002-velocity-tracking.md)
+- [x] [001 — Unified per-tick threat/opportunity evaluation core](tasks/001-unified-evaluation-core.md)
+- [x] [002 — Velocity tracking infrastructure](tasks/002-velocity-tracking.md)
 - [ ] [003 — Movement prediction / target interception](tasks/003-movement-prediction.md)
 - [ ] [004 — Multi-threat-aware fleeing](tasks/004-multi-threat-fleeing.md)
 - [ ] [005 — Dead-end / edge awareness while fleeing](tasks/005-edge-dead-end-awareness.md)
