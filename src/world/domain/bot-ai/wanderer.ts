@@ -17,6 +17,7 @@ export function wandererMove(
   bot: Bot,
   nearbyFood: PositionedMass[],
   _deltaTime: number,
+  _arenaRadius: number,
   rng: () => number = Math.random,
 ): Vector2 {
   const target = findNearestWithinRadius(

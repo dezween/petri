@@ -16,7 +16,7 @@ function makeBot(overrides: Partial<Bot> = {}): Bot {
 
 describe("wandererMove", () => {
   it("still returns a nonzero direction with no food nearby (never freezes)", () => {
-    const direction = wandererMove(makeBot(), [], 1 / 60);
+    const direction = wandererMove(makeBot(), [], 1 / 60, 500);
     expect(Math.hypot(direction.x, direction.z)).toBeGreaterThan(0);
   });
 
@@ -24,7 +24,7 @@ describe("wandererMove", () => {
     const bot = makeBot({ position: { x: 0, z: 0 } });
     const food = [{ id: "f1", position: { x: 50, z: 0 }, mass: 1 }];
 
-    const direction = wandererMove(bot, food, 1 / 60);
+    const direction = wandererMove(bot, food, 1 / 60, 500);
 
     expect(direction.x).toBeGreaterThan(0);
     expect(direction.z).toBeCloseTo(0, 5);
@@ -37,7 +37,7 @@ describe("wandererMove", () => {
       { id: "near", position: { x: 20, z: 0 }, mass: 1 },
     ];
 
-    const direction = wandererMove(bot, food, 1 / 60);
+    const direction = wandererMove(bot, food, 1 / 60, 500);
 
     expect(direction.x).toBeCloseTo(20, 5);
   });
@@ -46,7 +46,7 @@ describe("wandererMove", () => {
     const bot = makeBot({ position: { x: 0, z: 0 } });
     const farFood = [{ id: "f1", position: { x: 10_000, z: 0 }, mass: 1 }];
 
-    const direction = wandererMove(bot, farFood, 1 / 60);
+    const direction = wandererMove(bot, farFood, 1 / 60, 500);
 
     expect(Math.hypot(direction.x, direction.z)).toBeGreaterThan(0);
   });
@@ -55,7 +55,7 @@ describe("wandererMove", () => {
     const bot = makeBot({ position: { x: 0, z: 0 } });
     const rng = () => 0.25; // angle = 0.25 * 2*PI = PI/2 -> (cos, sin) = (0, 1)
 
-    const direction = wandererMove(bot, [], 1 / 60, rng);
+    const direction = wandererMove(bot, [], 1 / 60, 500, rng);
 
     expect(direction.x).toBeCloseTo(0, 5);
     expect(direction.z).toBeCloseTo(1, 5);
