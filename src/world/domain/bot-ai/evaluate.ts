@@ -8,6 +8,22 @@ export interface SteeringWeights {
   opportunityWeight: number;
 }
 
+/** Epic 4, task 003: how far ahead (seconds) a target's velocity is extrapolated before
+ * steering toward/away from it, so chasing/fleeing leads a moving target instead of chasing
+ * its stale current position. SPEC.md's starting value — tuned for real in the balance pass. */
+export const PREDICTION_LOOKAHEAD_SECONDS = 0.5;
+
+/** Predicted position after `PREDICTION_LOOKAHEAD_SECONDS`, or the entity's current position
+ * unchanged if it has no velocity data (degrades gracefully per task 003's acceptance
+ * criteria — never throws, never produces NaN). */
+function predictedPosition(entity: PositionedMass): Vector2 {
+  if (!entity.velocity) return entity.position;
+  return {
+    x: entity.position.x + entity.velocity.x * PREDICTION_LOOKAHEAD_SECONDS,
+    z: entity.position.z + entity.velocity.z * PREDICTION_LOOKAHEAD_SECONDS,
+  };
+}
+
 /**
  * Shared per-tick core (Epic 4, task 001): finds the nearest threat (mass > bot.mass) and
  * nearest opportunity (mass < bot.mass) within `detectionRadius`, blends an away-from-threat
@@ -52,9 +68,16 @@ export function evaluateSteering(
   // threat, since that's the only term being searched for at all.
   if (weights.opportunityWeight === 0 && !nearestThreat) return null;
 
-  const away = nearestThreat ? normalize(directionTo(nearestThreat.position, bot.position)) : { x: 0, z: 0 };
+  // Lead the target: steer relative to where it will be in PREDICTION_LOOKAHEAD_SECONDS, not
+  // where it is right now (task 003) — for a threat closing in, "away from predicted position"
+  // is further from the threat's actual future position than "away from current position"
+  // would be, so separation grows faster tick-over-tick; for prey moving in a straight line,
+  // "toward predicted position" is a genuine intercept rather than a tail-chase.
+  const away = nearestThreat
+    ? normalize(directionTo(predictedPosition(nearestThreat), bot.position))
+    : { x: 0, z: 0 };
   const toward = nearestOpportunity
-    ? normalize(directionTo(bot.position, nearestOpportunity.position))
+    ? normalize(directionTo(bot.position, predictedPosition(nearestOpportunity)))
     : { x: 0, z: 0 };
 
   const blended = {
