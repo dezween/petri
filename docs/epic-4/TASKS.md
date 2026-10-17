@@ -5,7 +5,7 @@ implemented yet — all tasks below are planning only.
 
 - [x] [001 — Unified per-tick threat/opportunity evaluation core](tasks/001-unified-evaluation-core.md)
 - [x] [002 — Velocity tracking infrastructure](tasks/002-velocity-tracking.md)
-- [ ] [003 — Movement prediction / target interception](tasks/003-movement-prediction.md)
+- [x] [003 — Movement prediction / target interception](tasks/003-movement-prediction.md)
 - [ ] [004 — Multi-threat-aware fleeing](tasks/004-multi-threat-fleeing.md)
 - [ ] [005 — Dead-end / edge awareness while fleeing](tasks/005-edge-dead-end-awareness.md)
 - [ ] [006 — Panic / urgency escalation when a threat is imminent](tasks/006-panic-urgency.md)
