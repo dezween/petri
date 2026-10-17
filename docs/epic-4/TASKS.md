@@ -13,5 +13,5 @@ implemented yet — all tasks below are planning only.
 - [x] [008 — Give up on a bad chase](tasks/008-give-up-bad-chase.md)
 - [x] [009 — Soft pack awareness (no inter-bot coordination)](tasks/009-soft-pack-awareness.md)
 - [x] [010 — Food-vs-prey utility weighing](tasks/010-food-vs-prey-utility.md)
-- [ ] [011 — Epic 4 playtest & balance pass](tasks/011-playtest-balance-pass.md)
-- [ ] [012 — README update for Epic 4](tasks/012-readme-update.md)
+- [x] [011 — Epic 4 playtest & balance pass](tasks/011-playtest-balance-pass.md)
+- [x] [012 — README update for Epic 4](tasks/012-readme-update.md)
