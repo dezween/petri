@@ -7,6 +7,7 @@ import { buildArenaFloorAndRim, createScene } from "./scene";
 import { addLighting, configureShadowFrustum } from "./lighting";
 import { adjustZoomForPlayerRadius, createCamera, updateCameraAspect, updateCameraPosition } from "./camera";
 import { loadAllModels } from "./model-loader";
+import type { ModelCache } from "./model-loader";
 import { CellMeshFactory, disposeObject3D } from "./cell-mesh-factory";
 import { ParticleSystem } from "./particles";
 import { buildStaticProps } from "./static-props";
@@ -28,8 +29,13 @@ export class ThreeRenderer implements IRenderer {
   private readonly particleSystem: ParticleSystem;
   private staticProps?: THREE.Group;
   private postProcessing?: PostProcessingPipeline;
+  /** Cached once `init()`'s model load resolves, so `setArenaWidth()` can rebuild static props
+   * at the new size without re-fetching every `.glb` — see `rebuildStaticProps()`. */
+  private models?: ModelCache;
+  private arenaWidth: number;
 
   constructor(arenaWidth: number = DEFAULT_ARENA_WIDTH) {
+    this.arenaWidth = arenaWidth;
     this.scene = createScene(arenaWidth);
     this.light = addLighting(this.scene, arenaWidth);
     this.camera = createCamera(1);
@@ -68,10 +74,11 @@ export class ThreeRenderer implements IRenderer {
 
         // Epic 2, task 012: static background decoration, built from the same partial
         // ModelCache — a missing/corrupt prop model degrades only that one prop (see
-        // static-props.ts), never the gameplay-critical meshes above. Loaded once here and
-        // never touched again; no per-frame updates.
-        this.staticProps = buildStaticProps(models);
-        this.scene.add(this.staticProps);
+        // static-props.ts), never the gameplay-critical meshes above. Cached so
+        // `setArenaWidth()` can rebuild these at the new size (see `rebuildStaticProps()`)
+        // without a second fetch of every prop `.glb`.
+        this.models = models;
+        this.rebuildStaticProps();
       })
       .catch((err: unknown) => {
         // loadAllModels itself no longer rejects for per-model load failures (those degrade
@@ -114,15 +121,20 @@ export class ThreeRenderer implements IRenderer {
   }
 
   /**
-   * Rebuilds the floor/rim in place at a new arena width (Epic 2, task 001) and reconfigures the
-   * shadow camera's frustum/depth-range to match (Epic 3, task 002 + the 10-size follow-up) —
-   * the camera and entity-mesh group are independent of arenaWidth and stay untouched. The light
+   * Rebuilds the floor/rim in place at a new arena width (Epic 2, task 001), reconfigures the
+   * shadow camera's frustum/depth-range to match (Epic 3, task 002 + the 10-size follow-up), and
+   * rebuilds the static background props at their new rim-relative positions (regression fix:
+   * props used to sit at a fixed absolute distance from the origin, so they ended up INSIDE the
+   * dish once arena sizes grew past the old fixed radius they were placed outside of) — the
+   * camera and entity-mesh group are independent of arenaWidth and stay untouched. The light
    * itself is reused, not recreated: `configureShadowFrustum` only touches its shadow-camera
    * properties. Reuses the same named-mesh disposal `dispose()` relies on, so the old floor/rim's
    * GPU resources never leak across a resize the way they would with a naive "just add a new
    * one" approach.
    */
   setArenaWidth(width: number): void {
+    this.arenaWidth = width;
+
     this.disposeNamedMesh("arena-floor");
     this.disposeNamedMesh("arena-rim");
 
@@ -131,6 +143,27 @@ export class ThreeRenderer implements IRenderer {
     this.scene.add(rim);
 
     configureShadowFrustum(this.light, width);
+
+    this.rebuildStaticProps();
+  }
+
+  /**
+   * (Re)builds the static background props at `this.arenaWidth`'s rim and swaps them into the
+   * scene, disposing whatever was there before. No-ops until `this.models` is populated (`init()`
+   * calls this itself once model loading resolves) — calling `setArenaWidth()` before `init()`'s
+   * load finishes is harmless, it just has nothing to (re)build yet, same as the mesh factory's
+   * own "no models loaded yet" tolerance elsewhere in this class.
+   */
+  private rebuildStaticProps(): void {
+    if (!this.models) return;
+
+    if (this.staticProps) {
+      this.scene.remove(this.staticProps);
+      disposeObject3D(this.staticProps);
+    }
+
+    this.staticProps = buildStaticProps(this.models, this.arenaWidth);
+    this.scene.add(this.staticProps);
   }
 
   /**
