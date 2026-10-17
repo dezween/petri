@@ -22,7 +22,7 @@ def main():
     clear_scene()
 
     body_mat = make_material("MicroscopeBodyMat", (0.07, 0.075, 0.09), roughness=0.35, metallic=0.15)
-    chrome_mat = make_material("MicroscopeChromeMat", (0.78, 0.79, 0.82), roughness=0.08, metallic=0.9)
+    chrome_mat = make_material("MicroscopeChromeMat", (0.92, 0.93, 0.96), roughness=0.06, metallic=0.95)
     brass_mat = make_material("MicroscopeBrassMat", (0.65, 0.48, 0.2), roughness=0.25, metallic=0.75)
     lens_mat = make_material("MicroscopeLensMat", (0.55, 0.72, 0.82), alpha=0.5, roughness=0.05, metallic=0.1)
 
@@ -35,7 +35,7 @@ def main():
         return obj
 
     # --- Base: a wide, slightly tapered foot the whole instrument stands on ---
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=1.15, depth=0.35, location=(0, 0.18, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=1.7, depth=0.55, location=(0, 0.18, 0))
     base = add(bpy.context.active_object, body_mat, "Microscope_Base")
     base.scale = (1.0, 1.0, 0.62)  # oval footprint, not a perfect circle
 
@@ -60,7 +60,7 @@ def main():
         # microscope's classic C-arm silhouette.
         x = arm_base_x + math.sin(t * math.pi * 0.55) * 1.35
         y = 0.35 + t * arm_height
-        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.32 - 0.08 * t, depth=arm_height / arm_segment_count * 1.25, location=(x, y, 0))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.6 - 0.12 * t, depth=arm_height / arm_segment_count * 1.25, location=(x, y, 0))
         seg = add(bpy.context.active_object, body_mat, f"Microscope_Arm_{i}")
         # Tilt each segment slightly to follow the curve's local tangent.
         seg.rotation_euler.z = -t * math.radians(28)
@@ -69,16 +69,16 @@ def main():
     arm_top_x = arm_base_x + math.sin(0.55 * math.pi) * 1.35
 
     # --- Head + eyepiece: sits atop the arm, angled back toward the viewer ---
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.42, depth=0.55, location=(arm_top_x, arm_top_y + 0.25, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.62, depth=0.75, location=(arm_top_x, arm_top_y + 0.25, 0))
     head = add(bpy.context.active_object, body_mat, "Microscope_Head")
     head.rotation_euler.x = math.radians(20)
 
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.16, depth=1.1, location=(arm_top_x - 0.15, arm_top_y + 0.85, -0.3))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.26, depth=1.3, location=(arm_top_x - 0.15, arm_top_y + 0.85, -0.3))
     eyepiece = add(bpy.context.active_object, chrome_mat, "Microscope_Eyepiece")
     eyepiece.rotation_euler.x = math.radians(35)
 
     # Eyepiece lens glint at the very top
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.17, segments=12, ring_count=8, location=(arm_top_x - 0.28, arm_top_y + 1.35, -0.6))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.26, segments=12, ring_count=8, location=(arm_top_x - 0.28, arm_top_y + 1.35, -0.6))
     add(bpy.context.active_object, lens_mat, "Microscope_EyepieceLens")
 
     # --- Focus adjustment knobs: a coarse/fine pair on each side of the arm's midsection ---
@@ -86,7 +86,7 @@ def main():
     knob_x = arm_base_x + math.sin(0.42 * math.pi * 0.55 / 0.55) * 0  # placeholder unused
     knob_center_x = arm_base_x + math.sin(0.42 * math.pi * 0.55) * 1.35
     for side in (-1, 1):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.22, depth=0.16, location=(knob_center_x + side * 0.32, knob_y, 0))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.4, depth=0.26, location=(knob_center_x + side * 0.32, knob_y, 0))
         knob = add(bpy.context.active_object, brass_mat, f"Microscope_FocusKnob_{side}")
         knob.rotation_euler.x = math.radians(90)
         # Small grip ridges: four thin boxes around the knob's rim read as knurling at a glance.
@@ -103,7 +103,7 @@ def main():
     # from the game's tilted top-down camera angle. ---
     turret_x = arm_top_x
     turret_y = 1.1
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.38, depth=0.14, location=(turret_x, turret_y, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.58, depth=0.2, location=(turret_x, turret_y, 0))
     turret_disc = add(bpy.context.active_object, chrome_mat, "Microscope_TurretDisc")
 
     barrel_lengths = (0.55, 0.42, 0.68)
@@ -112,17 +112,17 @@ def main():
         bx = turret_x + math.cos(angle) * 0.24
         bz = math.sin(angle) * 0.24
         by = turret_y - 0.1 - length / 2
-        bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.09, depth=length, location=(bx, by, bz))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.17, depth=length, location=(bx, by, bz))
         add(bpy.context.active_object, body_mat, f"Microscope_ObjectiveBarrel_{i}")
         # Lens glass at the tip of each barrel.
-        bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.085, depth=0.03, location=(bx, by - length / 2 - 0.015, bz))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.16, depth=0.05, location=(bx, by - length / 2 - 0.015, bz))
         add(bpy.context.active_object, lens_mat, f"Microscope_ObjectiveLens_{i}")
 
     # --- Stage: a wide flat plate extending from the base toward where the dish sits —
     # this is the piece that visually reads as "the dish is sitting on the microscope's
     # stage" even though the actual gameplay dish is a separate object elsewhere in the
     # scene — the plate just needs to gesture toward it. ---
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=1.5, depth=0.1, location=(0.6, 0.42, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=1.95, depth=0.16, location=(0.6, 0.42, 0))
     stage = add(bpy.context.active_object, chrome_mat, "Microscope_Stage")
     stage.scale = (1.3, 1.0, 1.3)
 
