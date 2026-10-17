@@ -106,6 +106,10 @@ export class WorldService {
    * defaults to `{0,0}` for any id with no entry, which covers both food and "no prior tick
    * yet" freshly-spawned entities identically. */
   private lastTickVelocities = new Map<string, Vector2>();
+  /** Epic 4, tasks 007/008: accumulated simulation time, read by hunter target-lock logic
+   * (commitment-floor expiry, give-up deadline) — independent of wall-clock time so it scales
+   * correctly with the substep-split deltaTime `tick()` already uses. */
+  private elapsedTime = 0;
 
   constructor(
     player: Player,
@@ -129,6 +133,7 @@ export class WorldService {
     // cap, so `substeps` is 1 and this is a no-op most of the time.
     const substeps = Math.max(1, Math.ceil(deltaTime / MAX_SUBSTEP_DELTA_TIME));
     const substepDelta = deltaTime / substeps;
+    this.elapsedTime += deltaTime;
     const eatenEvents: EatenEvent[] = [];
     let playerEaten = false;
 
@@ -218,18 +223,22 @@ export class WorldService {
 
   private moveBots(deltaTime: number): void {
     for (const bot of this.bots) {
-      const direction = this.computeBotDirection(bot, deltaTime);
-      this.applyMovement(bot, direction, deltaTime, BOT_BASE_SPEED);
+      const { direction, speedMultiplier } = this.computeBotDirection(bot, deltaTime);
+      this.applyMovement(bot, direction, deltaTime, BOT_BASE_SPEED * speedMultiplier);
     }
   }
 
-  private computeBotDirection(bot: Bot, deltaTime: number): Vector2 {
+  /** Epic 4, task 006: every behavior now returns a speed multiplier alongside direction
+   * (wanderer/hunter always 1 — see their own files — only a panicking fleer ever returns
+   * something else), so `moveBots` has one consistent shape to consume regardless of which
+   * behavior produced it. */
+  private computeBotDirection(bot: Bot, deltaTime: number): { direction: Vector2; speedMultiplier: number } {
     const arenaRadius = this.arenaWidth / 2;
     switch (bot.behavior) {
       case "wanderer":
-        return wandererMove(bot, this.foodAsPositionedMass(), deltaTime, arenaRadius);
+        return { direction: wandererMove(bot, this.foodAsPositionedMass(), deltaTime, arenaRadius), speedMultiplier: 1 };
       case "hunter":
-        return hunterMove(bot, this.othersFor(bot), deltaTime, arenaRadius);
+        return hunterMove(bot, this.othersFor(bot), deltaTime, arenaRadius, Math.random, this.elapsedTime);
       case "fleer":
         return fleerMove(bot, this.othersFor(bot), deltaTime, arenaRadius);
     }
@@ -240,7 +249,7 @@ export class WorldService {
   private othersFor(bot: Bot): PositionedMass[] {
     return [
       this.toPositionedMass(this.player),
-      ...this.bots.filter((b) => b.id !== bot.id).map((b) => this.toPositionedMass(b)),
+      ...this.bots.filter((b) => b.id !== bot.id).map((b) => this.toPositionedMass(b, b.behavior)),
       ...this.foodAsPositionedMass(),
     ];
   }
@@ -249,12 +258,16 @@ export class WorldService {
     return this.food.map((f) => this.toPositionedMass(f));
   }
 
-  private toPositionedMass(entity: Cell): PositionedMass {
+  /** `botBehavior` (Epic 4, task 009) is only ever passed for actual bots — the player and
+   * food always default to undefined, exactly matching `PositionedMass.botBehavior`'s own
+   * "set only for bots" contract. */
+  private toPositionedMass(entity: Cell, botBehavior?: BotBehavior): PositionedMass {
     return {
       id: entity.id,
       position: entity.position,
       mass: entity.mass,
       velocity: this.lastTickVelocities.get(entity.id) ?? { x: 0, z: 0 },
+      botBehavior,
     };
   }
 
